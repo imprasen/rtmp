@@ -41,61 +41,63 @@ export const Navbar: React.FC<NavbarProps> = ({ userState, onLogout, isDark, onT
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-1">
-            <Link
-              to="/"
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === "/"
-                  ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
-                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Radio className="w-4 h-4" /> Channels
-              </span>
-            </Link>
-
-            <Link
-              to="/multiview"
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname === "/multiview"
-                  ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
-                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <LayoutGrid className="w-4 h-4" /> Multi-View Grid
-              </span>
-            </Link>
-
-            <Link
-              to="/recordings"
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                location.pathname.startsWith("/recordings")
-                  ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
-                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Video className="w-4 h-4" /> VOD Recordings
-              </span>
-            </Link>
-
-            {userState.authenticated && userState.user?.role === "admin" && (
+          {userState.authenticated && (
+            <nav className="hidden md:flex items-center space-x-1">
               <Link
-                to="/users"
+                to="/"
                 className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  location.pathname === "/users"
+                  location.pathname === "/"
                     ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <Users className="w-4 h-4" /> Users
+                  <Radio className="w-4 h-4" /> Channels
                 </span>
               </Link>
-            )}
-          </nav>
+
+              <Link
+                to="/multiview"
+                className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  location.pathname === "/multiview"
+                    ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4" /> Multi-View Grid
+                </span>
+              </Link>
+
+              <Link
+                to="/recordings"
+                className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  location.pathname.startsWith("/recordings")
+                    ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Video className="w-4 h-4" /> VOD Recordings
+                </span>
+              </Link>
+
+              {userState.user?.role === "admin" && (
+                <Link
+                  to="/users"
+                  className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    location.pathname === "/users"
+                      ? "bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Users className="w-4 h-4" /> Users
+                  </span>
+                </Link>
+              )}
+            </nav>
+          )}
         </div>
 
         <div className="flex items-center space-x-3">

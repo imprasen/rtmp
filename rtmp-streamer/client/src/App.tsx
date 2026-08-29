@@ -80,21 +80,6 @@ export const App: React.FC = () => {
         />
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<Dashboard userState={userState} />} />
-            <Route path="/multiview" element={<MultiView />} />
-            <Route path="/watch/:key" element={<LivePlayer />} />
-            <Route path="/recordings" element={<Recordings userState={userState} />} />
-            <Route path="/recordings/:id" element={<RecordingPlayer userState={userState} />} />
-            <Route
-              path="/users"
-              element={
-                userState.authenticated && userState.user?.role === "admin" ? (
-                  <Users userState={userState} />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
             <Route
               path="/login"
               element={
@@ -105,7 +90,69 @@ export const App: React.FC = () => {
                 )
               }
             />
-            <Route path="*" element={<Navigate to="/" replace />} />
+
+            {/* Protected Routes — Strict Authentication Required */}
+            <Route
+              path="/"
+              element={
+                userState.authenticated ? (
+                  <Dashboard userState={userState} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route
+              path="/multiview"
+              element={
+                userState.authenticated ? (
+                  <MultiView />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route
+              path="/watch/:key"
+              element={
+                userState.authenticated ? (
+                  <LivePlayer />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route
+              path="/recordings"
+              element={
+                userState.authenticated ? (
+                  <Recordings userState={userState} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route
+              path="/recordings/:id"
+              element={
+                userState.authenticated ? (
+                  <RecordingPlayer userState={userState} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                userState.authenticated && userState.user?.role === "admin" ? (
+                  <Users userState={userState} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route path="*" element={<Navigate to={userState.authenticated ? "/" : "/login"} replace />} />
           </Routes>
         </main>
 

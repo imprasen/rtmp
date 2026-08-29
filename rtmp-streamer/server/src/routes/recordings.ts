@@ -7,6 +7,9 @@ import { cleanExpiredRecordings } from "../cron.js";
 
 export const recordingsRouter = Router();
 
+// Strict Security: All recording operations require active authenticated session
+recordingsRouter.use(requireAuth);
+
 const recordingsBaseDir = process.env.RECORDING_PATH || "/recordings";
 const defaultRetentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS || "7", 10);
 

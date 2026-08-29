@@ -5,6 +5,9 @@ import { requireAuth, requireAdmin } from "../middleware/optionalAuth.js";
 
 export const streamsRouter = Router();
 
+// Strict Security: All stream operations require active authenticated session
+streamsRouter.use(requireAuth);
+
 const mediamtxApiUrl = process.env.MEDIAMTX_API || "http://mediamtx:9997";
 const publicHost = process.env.PUBLIC_HOST || "localhost";
 const publicDomain = process.env.PUBLIC_DOMAIN || "live.dhanushuav.com";
