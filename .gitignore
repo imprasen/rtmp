@@ -1,10 +1,12 @@
 # Dependencies
 node_modules/
+**/node_modules/
 .pnp
 .pnp.js
 
 # Build Outputs
 dist/
+**/dist/
 build/
 *.tsbuildinfo
 
@@ -28,9 +30,9 @@ pnpm-debug.log*
 
 # Media Recordings (Do NOT commit recorded video files)
 recordings/
+**/recordings/
 *.mp4
 *.fmp4
-*.ts
 *.m3u8
 
 # OS & IDE Files
