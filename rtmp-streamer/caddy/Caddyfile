@@ -1,0 +1,38 @@
+# Caddy reverse proxy configuration
+# Automatically obtains Let's Encrypt TLS certificate for live.dhanushuav.com
+
+live.dhanushuav.com {
+    # 1. API Endpoints
+    handle /api/* {
+        reverse_proxy server:5011
+    }
+
+    # 2. HLS Video Playback
+    handle /hls/* {
+        uri strip_prefix /hls
+        reverse_proxy mediamtx:8888 {
+            header_up Host {upstream_hostport}
+        }
+    }
+
+    # 3. WebRTC WHEP Signaling (POST/DELETE/PATCH)
+    handle /whep/* {
+        uri strip_prefix /whep
+        reverse_proxy mediamtx:8889 {
+            header_up Host {upstream_hostport}
+        }
+    }
+
+    # 4. Frontend Web App (Default)
+    handle {
+        reverse_proxy client:80
+    }
+
+    # Compression & Security Headers
+    encode gzip zstd
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+}

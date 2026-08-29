@@ -1,0 +1,56 @@
+# MediaMTX Configuration (v1.20+)
+# Optimized for Ultra-Low Latency Drone Live Streaming & Auto-Recording
+
+###############################################
+# Protocol Listeners
+###############################################
+
+# RTMP Ingest (Drone / OBS push)
+rtmp: yes
+rtmpAddress: :1935
+rtmpEncryption: "no"
+
+# RTSP Ingest/Egress
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp, udp]
+
+# WebRTC (WHEP / WHIP) - Sub-500ms Ultra Low Latency playback
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8889
+webrtcAllowOrigins: ["*"]
+
+# HLS - Universal Low Latency fallback playback
+hls: yes
+hlsAddress: :8888
+hlsVariant: mpegts
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsAllowOrigins: ["*"]
+
+# MediaMTX Control API
+api: yes
+apiAddress: :9997
+
+###############################################
+# Authentication Hook
+###############################################
+authMethod: http
+authHTTPAddress: http://server:5011/api/hooks/auth
+
+###############################################
+# Paths Configuration
+###############################################
+paths:
+  # Path pattern matching all streams under live/*
+  ~^live/.*$:
+    # Auto-record flight as ONE single continuous MP4 file (up to 6 hours)
+    record: yes
+    recordPath: /recordings/%path_%Y-%m-%d_%H-%M-%S
+    recordFormat: fmp4
+    recordSegmentDuration: 6h
+
+  # Default fallback path
+  all_others:

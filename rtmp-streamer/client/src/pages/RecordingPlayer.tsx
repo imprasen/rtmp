@@ -1,0 +1,213 @@
+import React, { useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Download, ShieldCheck, Clock, Trash2, HardDrive, AlertCircle } from "lucide-react";
+import { api, RecordingItem, UserState } from "../services/api";
+
+interface RecordingPlayerProps {
+  userState: UserState;
+}
+
+export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  const [recording, setRecording] = useState<RecordingItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [customDays, setCustomDays] = useState<number>(7);
+
+  const fetchRecording = async () => {
+    try {
+      const res = await api.get(`/recordings/${id}`);
+      setRecording(res.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to load recording");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecording();
+  }, [id]);
+
+  const handleToggleKeep = async () => {
+    if (!recording) return;
+    try {
+      await api.patch(`/recordings/${recording.id}/keep`, {});
+      fetchRecording();
+    } catch (err) {
+      console.error("Failed to toggle keep:", err);
+    }
+  };
+
+  const handleSetCustomDays = async (days: number) => {
+    if (!recording) return;
+    try {
+      await api.patch(`/recordings/${recording.id}/keep`, { retention_days: days });
+      fetchRecording();
+    } catch (err) {
+      console.error("Failed to set retention days:", err);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!recording || !window.confirm("Are you sure you want to permanently delete this flight video?")) return;
+    try {
+      await api.delete(`/recordings/${recording.id}`);
+      navigate("/recordings");
+    } catch (err) {
+      console.error("Failed to delete recording:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-20 text-center text-slate-400">
+        Loading flight recording player...
+      </div>
+    );
+  }
+
+  if (error || !recording) {
+    return (
+      <div className="max-w-md mx-auto my-20 p-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl text-center shadow-xl">
+        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-3" />
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Recording Not Found</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">{error || "The requested video does not exist."}</p>
+        <Link
+          to="/recordings"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Recordings
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Back button & Title */}
+      <div className="flex items-center justify-between pb-6 border-b border-slate-200 dark:border-slate-800">
+        <Link
+          to="/recordings"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to VOD Recordings
+        </Link>
+
+        {/* Retention Status Badge */}
+        {recording.is_kept ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40">
+            <ShieldCheck className="w-4 h-4" /> Kept (Do Not Delete)
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40">
+            <Clock className="w-4 h-4" />
+            {recording.days_until_expiry !== null
+              ? `Auto-deletes in ${recording.days_until_expiry} days`
+              : "7-Day Auto-Delete"}
+          </span>
+        )}
+      </div>
+
+      {/* Video Player */}
+      <div className="mt-6 bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 aspect-video">
+        <video
+          controls
+          autoPlay
+          className="w-full h-full object-contain bg-black"
+          src={recording.stream_url}
+        >
+          Your browser does not support HTML5 MP4 video playback.
+        </video>
+      </div>
+
+      {/* Flight Video Metadata & Actions Bar */}
+      <div className="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{recording.filename}</h2>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+              Flight Channel: {recording.stream_name} (#{recording.stream_key})
+            </p>
+
+            <div className="flex items-center gap-6 mt-4 text-xs text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1.5 font-medium">
+                <HardDrive className="w-4 h-4 text-slate-400" /> Size:{" "}
+                <span className="text-slate-800 dark:text-slate-200 font-mono font-semibold">
+                  {recording.file_size_formatted}
+                </span>
+              </span>
+
+              <span className="flex items-center gap-1.5 font-medium">
+                <Clock className="w-4 h-4 text-slate-400" /> Recorded:{" "}
+                <span className="text-slate-800 dark:text-slate-200">
+                  {new Date(recording.created_at).toLocaleString()}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Retention Options & Action Buttons */}
+          <div className="flex flex-wrap items-center gap-3">
+            {userState.authenticated && (
+              <>
+                <button
+                  onClick={handleToggleKeep}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+                    recording.is_kept
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-900/30"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-emerald-500"
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  {recording.is_kept ? "Protected (Kept Forever)" : "Keep / Do Not Delete"}
+                </button>
+
+                {/* Custom Retention Dropdown */}
+                <select
+                  value={recording.is_kept ? "kept" : customDays}
+                  onChange={(e) => {
+                    if (e.target.value === "kept") {
+                      handleToggleKeep();
+                    } else {
+                      const days = parseInt(e.target.value, 10);
+                      setCustomDays(days);
+                      handleSetCustomDays(days);
+                    }
+                  }}
+                  className="px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value={7}>Keep for 7 Days</option>
+                  <option value={14}>Keep for 14 Days</option>
+                  <option value={30}>Keep for 30 Days</option>
+                  <option value={90}>Keep for 90 Days</option>
+                  <option value="kept">Keep Forever (Do Not Delete)</option>
+                </select>
+              </>
+            )}
+
+            <a
+              href={recording.download_url}
+              download
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 transition-colors"
+            >
+              <Download className="w-4 h-4" /> Download MP4
+            </a>
+
+            {userState.authenticated && (
+              <button
+                onClick={handleDelete}
+                className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
+                title="Delete recording permanently"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

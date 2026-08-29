@@ -1,0 +1,63 @@
+# ================================================================
+# Local RTMP Live-Streaming Application (Docker Compose)
+# ================================================================
+
+services:
+  # 1. MediaMTX: Media server (RTMP, WebRTC, HLS, RTSP)
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: rtmp-mediamtx
+    restart: unless-stopped
+    ports:
+      - "1935:1935"   # RTMP ingest (drones / OBS push)
+      - "8554:8554"   # RTSP ingest / playback
+      - "8888:8888"   # HLS (LL-HLS) playback
+      - "8889:8889"   # WebRTC (WHEP) signaling (TCP)
+      - "8889:8889/udp" # WebRTC media transport (UDP)
+      - "9997:9997"   # MediaMTX REST API
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+      - ./recordings:/recordings
+    environment:
+      - MTX_API=yes
+
+  # 2. Backend Server: Node.js API + SQLite DB + Cleanup Cron
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: rtmp-server
+    restart: unless-stopped
+    ports:
+      - "5011:5011"
+    volumes:
+      - server-data:/app/data
+      - ./recordings:/recordings
+    environment:
+      - PORT=5011
+      - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET:-live-stream-secret-key-change-in-production-random-64-char}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin@123}
+      - RECORDING_RETENTION_DAYS=${RECORDING_RETENTION_DAYS:-7}
+      - RECORDING_PATH=/recordings
+      - MEDIAMTX_API=http://mediamtx:9997
+      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-live.dhanushuav.com}
+    depends_on:
+      - mediamtx
+
+  # 3. Frontend Web Dashboard: React 18 + Vite (Served via Nginx)
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: rtmp-client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
+volumes:
+  server-data:

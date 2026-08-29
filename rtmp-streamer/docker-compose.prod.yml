@@ -1,0 +1,54 @@
+# ================================================================
+# Production Override (GPU Hardware Encoding & Caddy Reverse Proxy)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ================================================================
+
+services:
+  mediamtx:
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, video]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  server:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: rtmp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - client
+      - server
+      - mediamtx
+
+volumes:
+  caddy-data:
+  caddy-config:
