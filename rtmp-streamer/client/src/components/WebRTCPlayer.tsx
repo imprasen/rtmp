@@ -50,8 +50,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
           videoRef.current.play().catch(() => {});
         }
         setStatus("connected");
-        const elapsed = Math.round(performance.now() - startTime);
-        setLatencyMs(elapsed < 800 ? elapsed : 320);
+        setLatencyMs(Math.round(performance.now() - startTime));
       };
 
       pc.onconnectionstatechange = () => {
@@ -66,8 +65,8 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const host = window.location.hostname || "localhost";
-      const whepUrl = `http://${host}:8889/live/${streamKey}/whep`;
+      // Use relative URL through Nginx reverse proxy (works on both HTTP and HTTPS)
+      const whepUrl = `/whep/live/${streamKey}/whep`;
 
       const res = await fetch(whepUrl, {
         method: "POST",

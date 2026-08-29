@@ -25,9 +25,13 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-$durationArg = if ($DurationSeconds -gt 0) { "-t $DurationSeconds" } else { "" }
+$extraArgs = @()
+if ($DurationSeconds -gt 0) {
+    $extraArgs += "-t"
+    $extraArgs += "$DurationSeconds"
+}
 
 ffmpeg -re -f lavfi -i "testsrc2=size=${Resolution}:rate=30" `
        -f lavfi -i "sine=frequency=440:sample_rate=44100" `
        -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -b:v "${BitrateKbps}k" -g 30 `
-       -c:a aac -b:a 128k $durationArg -f flv "$rtmpUrl"
+       -c:a aac -b:a 128k @extraArgs -f flv "$rtmpUrl"

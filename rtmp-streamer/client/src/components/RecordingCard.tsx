@@ -38,7 +38,7 @@ export const RecordingCard: React.FC<RecordingCardProps> = ({
           ) : (
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                (recording.days_until_expiry || 7) <= 2
+                (recording.days_until_expiry ?? 7) <= 2
                   ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/30"
                   : "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
               }`}

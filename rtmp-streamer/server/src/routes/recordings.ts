@@ -51,10 +51,11 @@ export function syncRecordingsFromDisk() {
         const stream = db.prepare("SELECT id, name FROM streams WHERE stream_key = ?").get(streamKey) as { id: number; name: string } | undefined;
         const streamId = stream ? stream.id : null;
 
+        const expiresAt = new Date(Date.now() + defaultRetentionDays * 24 * 60 * 60 * 1000).toISOString();
         db.prepare(`
           INSERT INTO recordings (stream_id, stream_key, filename, filepath, file_size, expires_at, created_at)
-          VALUES (?, ?, ?, ?, ?, datetime('now', '+${defaultRetentionDays} days'), datetime('now'))
-        `).run(streamId, streamKey, filename, fullPath, stats.size);
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `).run(streamId, streamKey, filename, fullPath, stats.size, expiresAt);
         console.log(`[SYNC] Auto-indexed recording: ${filename} for stream "${streamKey}" (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
       }
     }
@@ -207,10 +208,27 @@ recordingsRouter.get("/:id", (req: Request, res: Response) => {
 // 4. Stream video with HTTP 206 Partial Content (Range Requests for Seeking)
 recordingsRouter.get("/:id/stream", (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const recording = db.prepare("SELECT * FROM recordings WHERE id = ?").get(id) as any;
+  const recording = db.prepare(`
+    SELECT r.*, s.is_public
+    FROM recordings r
+    LEFT JOIN streams s ON r.stream_id = s.id OR r.stream_key = s.stream_key
+    WHERE r.id = ?
+  `).get(id) as any;
 
   if (!recording || !fs.existsSync(recording.filepath)) {
     return res.status(404).json({ error: "Video file not found on disk" });
+  }
+
+  const isAuth = !!(req.session && req.session.userId);
+  if (!recording.is_public && !isAuth) {
+    return res.status(401).json({ error: "Authentication required for private recording" });
+  }
+
+  // P0-5: Verify file path is within recordings directory (prevent path traversal)
+  const resolvedPath = path.resolve(recording.filepath);
+  const resolvedBase = path.resolve(recordingsBaseDir);
+  if (!resolvedPath.startsWith(resolvedBase)) {
+    return res.status(403).json({ error: "Access denied" });
   }
 
   const stat = fs.statSync(recording.filepath);
@@ -221,6 +239,13 @@ recordingsRouter.get("/:id/stream", (req: Request, res: Response) => {
     const parts = range.replace(/bytes=/, "").split("-");
     const start = parseInt(parts[0], 10);
     const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    // Validate range values
+    if (isNaN(start) || isNaN(end) || start < 0 || end >= fileSize || start > end) {
+      res.setHeader("Content-Range", `bytes */${fileSize}`);
+      return res.status(416).json({ error: "Range not satisfiable" });
+    }
+
     const chunksize = end - start + 1;
     const file = fs.createReadStream(recording.filepath, { start, end });
     const head = {
@@ -230,6 +255,7 @@ recordingsRouter.get("/:id/stream", (req: Request, res: Response) => {
       "Content-Type": "video/mp4",
     };
     res.writeHead(206, head);
+    file.on("error", () => res.end());
     file.pipe(res);
   } else {
     const head = {
@@ -238,17 +264,36 @@ recordingsRouter.get("/:id/stream", (req: Request, res: Response) => {
       "Accept-Ranges": "bytes",
     };
     res.writeHead(200, head);
-    fs.createReadStream(recording.filepath).pipe(res);
+    const stream = fs.createReadStream(recording.filepath);
+    stream.on("error", () => res.end());
+    stream.pipe(res);
   }
 });
 
 // 5. Download video as MP4 attachment
 recordingsRouter.get("/:id/download", (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const recording = db.prepare("SELECT * FROM recordings WHERE id = ?").get(id) as any;
+  const recording = db.prepare(`
+    SELECT r.*, s.is_public
+    FROM recordings r
+    LEFT JOIN streams s ON r.stream_id = s.id OR r.stream_key = s.stream_key
+    WHERE r.id = ?
+  `).get(id) as any;
 
   if (!recording || !fs.existsSync(recording.filepath)) {
     return res.status(404).json({ error: "Video file not found on disk" });
+  }
+
+  const isAuth = !!(req.session && req.session.userId);
+  if (!recording.is_public && !isAuth) {
+    return res.status(401).json({ error: "Authentication required for private recording" });
+  }
+
+  // P0-5: Verify file path is within recordings directory
+  const resolvedPath = path.resolve(recording.filepath);
+  const resolvedBase = path.resolve(recordingsBaseDir);
+  if (!resolvedPath.startsWith(resolvedBase)) {
+    return res.status(403).json({ error: "Access denied" });
   }
 
   return res.download(recording.filepath, recording.filename);
@@ -264,13 +309,14 @@ recordingsRouter.patch("/:id/keep", requireAuth, (req: Request, res: Response) =
     return res.status(404).json({ error: "Recording not found" });
   }
 
-  if (retention_days !== undefined && typeof retention_days === "number") {
-    // Custom retention days (e.g. 14, 30, 90 days)
+  if (retention_days !== undefined && typeof retention_days === "number" && retention_days > 0 && retention_days <= 365) {
+    // P0-8: Compute date in JS to avoid SQL injection via template string
+    const expiresAt = new Date(Date.now() + retention_days * 24 * 60 * 60 * 1000).toISOString();
     db.prepare(`
       UPDATE recordings
-      SET is_kept = 0, expires_at = datetime(created_at, '+${retention_days} days')
+      SET is_kept = 0, expires_at = ?
       WHERE id = ?
-    `).run(id);
+    `).run(expiresAt, id);
     return res.json({
       message: `Retention updated to ${retention_days} days`,
       is_kept: false,
@@ -285,11 +331,13 @@ recordingsRouter.patch("/:id/keep", requireAuth, (req: Request, res: Response) =
     db.prepare("UPDATE recordings SET is_kept = 1, expires_at = NULL WHERE id = ?").run(id);
   } else {
     // 7-day auto-delete
+    // P0-8: Compute date in JS to avoid SQL injection
+    const defaultExpiry = new Date(Date.now() + defaultRetentionDays * 24 * 60 * 60 * 1000).toISOString();
     db.prepare(`
       UPDATE recordings
-      SET is_kept = 0, expires_at = datetime(created_at, '+${defaultRetentionDays} days')
+      SET is_kept = 0, expires_at = ?
       WHERE id = ?
-    `).run(id);
+    `).run(defaultExpiry, id);
   }
 
   return res.json({

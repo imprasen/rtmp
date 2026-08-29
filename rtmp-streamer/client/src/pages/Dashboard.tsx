@@ -99,7 +99,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userState }) => {
           {userState.authenticated && (
             <button
               onClick={() => {
-                setFormCustomKey(Math.floor(10000 + Math.random() * 90000).toString());
+                const array = new Uint32Array(1);
+                window.crypto.getRandomValues(array);
+                setFormCustomKey((10000 + (array[0] % 90000)).toString());
                 setShowModal(true);
               }}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-900/30 transition-all hover:scale-[1.02]"
@@ -126,7 +128,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userState }) => {
           {userState.authenticated && (
             <button
               onClick={() => {
-                setFormCustomKey(Math.floor(10000 + Math.random() * 90000).toString());
+                const array = new Uint32Array(1);
+                window.crypto.getRandomValues(array);
+                setFormCustomKey((10000 + (array[0] % 90000)).toString());
                 setShowModal(true);
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl shadow transition-colors"

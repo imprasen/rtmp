@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { randomInt } from "crypto";
 import { db } from "../db.js";
 import { requireAuth, requireAdmin } from "../middleware/optionalAuth.js";
 
@@ -24,7 +25,7 @@ function generate5DigitKey(): string {
   let attempts = 0;
 
   while (exists && attempts < 100) {
-    key = Math.floor(10000 + Math.random() * 90000).toString();
+    key = randomInt(10000, 100000).toString(); // crypto-secure random 5-digit key
     const row = db.prepare("SELECT id FROM streams WHERE stream_key = ?").get(key);
     if (!row) {
       exists = false;
@@ -165,7 +166,12 @@ streamsRouter.post("/", requireAuth, (req: Request, res: Response) => {
   // Generate 5-digit numeric key if not provided
   let key = generate5DigitKey();
   if (custom_key && typeof custom_key === "string" && custom_key.trim().length > 0) {
-    key = custom_key.trim();
+    const sanitized = custom_key.trim();
+    // P0-5: Only allow safe characters in stream keys (prevent path traversal)
+    if (!/^[a-zA-Z0-9_-]{3,64}$/.test(sanitized)) {
+      return res.status(400).json({ error: "Stream key must be 3-64 characters, alphanumeric, dashes, or underscores only" });
+    }
+    key = sanitized;
   }
 
   try {

@@ -14,7 +14,7 @@ services:
       - "8888:8888"   # HLS (LL-HLS) playback
       - "8889:8889"   # WebRTC (WHEP) signaling (TCP)
       - "8889:8889/udp" # WebRTC media transport (UDP)
-      - "9997:9997"   # MediaMTX REST API
+      - "127.0.0.1:9997:9997"   # MediaMTX REST API (internal only — P0-6)
     volumes:
       - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
       - ./recordings:/recordings
@@ -29,7 +29,7 @@ services:
     container_name: rtmp-server
     restart: unless-stopped
     ports:
-      - "5011:5011"
+      - "127.0.0.1:5011:5011"   # API (internal only, access via Nginx — P0-6)
     volumes:
       - server-data:/app/data
       - ./recordings:/recordings
