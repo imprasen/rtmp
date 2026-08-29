@@ -10,6 +10,7 @@ import { authRouter } from "./routes/auth.js";
 import { streamsRouter } from "./routes/streams.js";
 import { recordingsRouter } from "./routes/recordings.js";
 import { hooksRouter } from "./routes/hooks.js";
+import { usersRouter } from "./routes/users.js";
 
 dotenv.config();
 
@@ -91,6 +92,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/streams", streamsRouter);
 app.use("/api/recordings", recordingsRouter);
 app.use("/api/hooks", hooksRouter);
+app.use("/api/users", usersRouter);
 
 // Global error handler — prevent stack trace leakage
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

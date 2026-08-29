@@ -8,6 +8,7 @@ import { MultiView } from "./pages/MultiView";
 import { Recordings } from "./pages/Recordings";
 import { RecordingPlayer } from "./pages/RecordingPlayer";
 import { Login } from "./pages/Login";
+import { Users } from "./pages/Users";
 
 export const App: React.FC = () => {
   const [userState, setUserState] = useState<UserState>({
@@ -84,6 +85,16 @@ export const App: React.FC = () => {
             <Route path="/watch/:key" element={<LivePlayer />} />
             <Route path="/recordings" element={<Recordings userState={userState} />} />
             <Route path="/recordings/:id" element={<RecordingPlayer userState={userState} />} />
+            <Route
+              path="/users"
+              element={
+                userState.authenticated && userState.user?.role === "admin" ? (
+                  <Users userState={userState} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
             <Route
               path="/login"
               element={

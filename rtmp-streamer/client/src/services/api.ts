@@ -60,3 +60,11 @@ export interface UserState {
     role: string;
   } | null;
 }
+
+export interface UserItem {
+  id: number;
+  username: string;
+  role: "admin" | "operator" | "viewer";
+  created_at: string;
+}
+
