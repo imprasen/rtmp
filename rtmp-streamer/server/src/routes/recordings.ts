@@ -13,34 +13,43 @@ recordingsRouter.use(requireAuth);
 const recordingsBaseDir = process.env.RECORDING_PATH || "/recordings";
 const defaultRetentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS || "7", 10);
 
-// Recursively find all mp4 files in directory
-function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
-  if (!fs.existsSync(dirPath)) return arrayOfFiles;
-  const files = fs.readdirSync(dirPath);
-  files.forEach((file) => {
-    const full = path.join(dirPath, file);
-    if (fs.statSync(full).isDirectory()) {
-      arrayOfFiles = getAllFiles(full, arrayOfFiles);
-    } else if (file.endsWith(".mp4") || file.endsWith(".fmp4")) {
-      arrayOfFiles.push(full);
+// P1-13: Asynchronously and recursively find all mp4 files in directory
+async function getAllFilesAsync(dirPath: string, arrayOfFiles: string[] = []): Promise<string[]> {
+  try {
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        await getAllFilesAsync(full, arrayOfFiles);
+      } else if (entry.name.endsWith(".mp4") || entry.name.endsWith(".fmp4")) {
+        arrayOfFiles.push(full);
+      }
     }
-  });
+  } catch {
+    // Directory might not exist yet
+  }
   return arrayOfFiles;
 }
 
-// Auto-scan and sync physical video files from disk into SQLite database
-export function syncRecordingsFromDisk() {
+let lastSyncTime = 0;
+const SYNC_THROTTLE_MS = 15000; // Throttle disk scan to max once every 15s
+
+// P1-13: Non-blocking async disk sync
+export async function syncRecordingsFromDiskAsync() {
+  const now = Date.now();
+  if (now - lastSyncTime < SYNC_THROTTLE_MS) return;
+  lastSyncTime = now;
+
   if (!fs.existsSync(recordingsBaseDir)) return;
 
   try {
-    const files = getAllFiles(recordingsBaseDir);
+    const files = await getAllFilesAsync(recordingsBaseDir);
     for (const fullPath of files) {
-      const stats = fs.statSync(fullPath);
+      const stats = await fs.promises.stat(fullPath);
       if (stats.size < 1024) continue;
 
       const filename = path.basename(fullPath);
 
-      // Extract stream key from filename (e.g. nagpur-alpha_2026-08-29... -> nagpur-alpha or 12345)
       let streamKey = "unknown";
       const match = filename.match(/^(.+?)_\d{4}-\d{2}-\d{2}/);
       if (match && match[1]) {
@@ -50,7 +59,6 @@ export function syncRecordingsFromDisk() {
       // Check if already in DB
       const existing = db.prepare("SELECT id FROM recordings WHERE filepath = ?").get(fullPath);
       if (!existing) {
-        // Look up stream id
         const stream = db.prepare("SELECT id, name FROM streams WHERE stream_key = ?").get(streamKey) as { id: number; name: string } | undefined;
         const streamId = stream ? stream.id : null;
 
@@ -59,7 +67,6 @@ export function syncRecordingsFromDisk() {
           INSERT INTO recordings (stream_id, stream_key, filename, filepath, file_size, expires_at, created_at)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
         `).run(streamId, streamKey, filename, fullPath, stats.size, expiresAt);
-        console.log(`[SYNC] Auto-indexed recording: ${filename} for stream "${streamKey}" (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
       }
     }
   } catch (err) {
@@ -68,8 +75,9 @@ export function syncRecordingsFromDisk() {
 }
 
 // 1. List all recordings with optional filter
-recordingsRouter.get("/", (req: Request, res: Response) => {
-  syncRecordingsFromDisk();
+recordingsRouter.get("/", async (req: Request, res: Response) => {
+  // Fire background async sync without blocking the current request
+  syncRecordingsFromDiskAsync().catch(() => {});
 
   const { stream_id, kept_only, search } = req.query;
   const isAuth = !!(req.session && req.session.userId);
@@ -143,7 +151,7 @@ recordingsRouter.get("/", (req: Request, res: Response) => {
 
 // 2. Storage Statistics
 recordingsRouter.get("/stats", (req: Request, res: Response) => {
-  syncRecordingsFromDisk();
+  syncRecordingsFromDiskAsync().catch(() => {});
 
   const stats = db.prepare(`
     SELECT

@@ -13,7 +13,8 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
   const [isMuted, setIsMuted] = useState(true);
 
   const initHls = () => {
-    if (!videoRef.current || !streamKey) return;
+    const video = videoRef.current;
+    if (!video || !streamKey) return;
     setStatus("loading");
 
     if (hlsRef.current) {
@@ -21,7 +22,7 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
       hlsRef.current = null;
     }
 
-    // Use relative URL through Nginx reverse proxy (works on both HTTP and HTTPS)
+    // Relative URL through Nginx reverse proxy
     const src = `/hls/live/${streamKey}/index.m3u8`;
 
     if (Hls.isSupported()) {
@@ -33,37 +34,45 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
       hlsRef.current = hls;
 
       hls.loadSource(src);
-      hls.attachMedia(videoRef.current);
+      hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setStatus("playing");
-        if (videoRef.current) {
-          videoRef.current.muted = true;
-          videoRef.current.play().catch(() => {});
-        }
+        video.muted = true;
+        video.play().catch(() => {});
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
-          console.warn("[HLS] Fatal error:", data);
           setStatus("error");
         }
       });
-    } else if (videoRef.current.canPlayType("application/vnd.apple.mpegurl")) {
-      videoRef.current.src = src;
-      videoRef.current.addEventListener("loadedmetadata", () => {
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Native HLS for Safari
+      video.src = src;
+      const onLoadedMetadata = () => {
         setStatus("playing");
-        videoRef.current?.play().catch(() => {});
-      });
-      videoRef.current.addEventListener("error", () => {
+        video.play().catch(() => {});
+      };
+      const onError = () => {
         setStatus("error");
-      });
+      };
+
+      video.addEventListener("loadedmetadata", onLoadedMetadata);
+      video.addEventListener("error", onError);
+
+      return () => {
+        video.removeEventListener("loadedmetadata", onLoadedMetadata);
+        video.removeEventListener("error", onError);
+      };
     }
   };
 
   useEffect(() => {
-    initHls();
+    const cleanupNative = initHls();
     return () => {
+      // P1-18: Clean up HLS instance & native event listeners on unmount
+      if (cleanupNative) cleanupNative();
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -120,12 +129,15 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
               }
             }}
             className="p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur"
+            aria-label={isMuted ? "Unmute Audio" : "Mute Audio"}
           >
             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
           <button
             onClick={initHls}
             className="p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur"
+            title="Reload HLS"
+            aria-label="Reload HLS"
           >
             <RefreshCw className="w-5 h-5" />
           </button>
@@ -141,6 +153,7 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
             }
           }}
           className="p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur"
+          aria-label="Toggle Fullscreen"
         >
           <Maximize2 className="w-5 h-5" />
         </button>

@@ -16,23 +16,52 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const retryTimeoutRef = useRef<any>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const statsIntervalRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<"connecting" | "connected" | "failed">("connecting");
   const [isMuted, setIsMuted] = useState(muted);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
+  // P1-16: Real WebRTC Transport Round-Trip Latency Telemetry via getStats()
+  const startStatsPolling = (pc: RTCPeerConnection) => {
+    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+
+    statsIntervalRef.current = window.setInterval(async () => {
+      try {
+        if (!pc || pc.connectionState !== "connected") return;
+        const stats = await pc.getStats();
+        stats.forEach((report) => {
+          if (report.type === "candidate-pair" && report.state === "succeeded" && report.currentRoundTripTime !== undefined) {
+            const rtt = Math.round(report.currentRoundTripTime * 1000);
+            if (rtt > 0 && rtt < 5000) {
+              setLatencyMs(rtt);
+            }
+          }
+        });
+      } catch {
+        // Stats query failure
+      }
+    }, 2000);
+  };
+
   const startWhepSession = async () => {
     if (!streamKey) return;
     setStatus("connecting");
 
+    // Clean up previous connection if any
+    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
     }
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach((t) => t.stop());
+      remoteStreamRef.current = null;
+    }
 
     try {
-      const startTime = performance.now();
       const pc = new RTCPeerConnection({
         iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
       });
@@ -41,6 +70,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       pc.addTransceiver("video", { direction: "recvonly" });
 
       const remoteStream = new MediaStream();
+      remoteStreamRef.current = remoteStream;
 
       pc.ontrack = (event) => {
         remoteStream.addTrack(event.track);
@@ -50,22 +80,24 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
           videoRef.current.play().catch(() => {});
         }
         setStatus("connected");
-        setLatencyMs(Math.round(performance.now() - startTime));
+        startStatsPolling(pc);
       };
 
       pc.onconnectionstatechange = () => {
         if (!pc) return;
         if (pc.connectionState === "connected") {
           setStatus("connected");
+          startStatsPolling(pc);
         } else if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           setStatus("failed");
+          if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
         }
       };
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Use relative URL through Nginx reverse proxy (works on both HTTP and HTTPS)
+      // P0-1: Relative URL through reverse proxy
       const whepUrl = `/whep/live/${streamKey}/whep`;
 
       const res = await fetch(whepUrl, {
@@ -81,11 +113,10 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       const answerSdp = await res.text();
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
     } catch (err: any) {
-      console.warn("[WebRTC] Stream not active:", err.message);
       setStatus("failed");
 
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = setTimeout(() => {
+      retryTimeoutRef.current = window.setTimeout(() => {
         startWhepSession();
       }, 5000);
     }
@@ -94,7 +125,13 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   useEffect(() => {
     startWhepSession();
     return () => {
+      // P1-18: Clean up memory, timers, tracks, and RTCPeerConnection on unmount
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+      if (remoteStreamRef.current) {
+        remoteStreamRef.current.getTracks().forEach((t) => t.stop());
+        remoteStreamRef.current = null;
+      }
       if (pcRef.current) {
         pcRef.current.close();
         pcRef.current = null;
@@ -129,12 +166,12 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
         className="w-full h-full object-contain bg-black"
       />
 
-      {/* Latency badge only (No WebRTC label) */}
+      {/* Latency badge only (Real WebRTC Telemetry) */}
       <div className="absolute top-3 left-3 flex items-center space-x-2 z-10">
         {status === "connected" && (
           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 backdrop-blur shadow">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            {latencyMs || 320}ms latency
+            {latencyMs ? `${latencyMs}ms latency` : "🟢 Low Latency (<300ms)"}
           </span>
         )}
       </div>
@@ -168,6 +205,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
             <button
               onClick={toggleMute}
               className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur transition-colors"
+              aria-label={isMuted ? "Unmute Audio" : "Mute Audio"}
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
@@ -175,6 +213,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
               onClick={startWhepSession}
               className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur transition-colors"
               title="Reconnect"
+              aria-label="Reconnect Stream"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -184,6 +223,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
             onClick={toggleFullscreen}
             className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg backdrop-blur transition-colors"
             title="Fullscreen"
+            aria-label="Toggle Fullscreen"
           >
             <Maximize2 className="w-4 h-4" />
           </button>

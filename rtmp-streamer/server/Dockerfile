@@ -25,8 +25,12 @@ RUN npm install --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
-# Data volume for SQLite
-VOLUME ["/app/data", "/recordings"]
+# Create runtime directories
+RUN mkdir -p /app/data /recordings
+
+# P1-17: Healthcheck
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:5011/api/health || exit 1
 
 EXPOSE 5011
 

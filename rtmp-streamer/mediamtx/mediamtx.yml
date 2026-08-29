@@ -19,7 +19,7 @@ rtspTransports: [tcp, udp]
 webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8889
-webrtcAllowOrigins: ["*"]
+webrtcAllowOrigins: ["http://localhost:3000", "http://127.0.0.1:3000", "https://live.dhanushuav.com"]
 
 # HLS - Universal Low Latency fallback playback
 hls: yes
@@ -28,7 +28,7 @@ hlsVariant: mpegts
 hlsSegmentCount: 3
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
-hlsAllowOrigins: ["*"]
+hlsAllowOrigins: ["http://localhost:3000", "http://127.0.0.1:3000", "https://live.dhanushuav.com"]
 
 # MediaMTX Control API
 api: yes
