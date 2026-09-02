@@ -16,3 +16,8 @@
   - Maintain a dedicated audit file named:
     `MDs/DAILY PROGRESS/server-dated-DD-MM-YYYY.md`
   - Record the exact device, ports, MAC addresses, IP subnets, ACL rules, NAT/port forwarding mappings, and step-by-step rollback procedures so any change can be safely reviewed or reversed if needed.
+
+## Rule 3: Container Runtime Directory & Details Logging
+- Maintain and continuously update:
+  `MDs/all container_details.md`
+  with all running Docker containers, image versions, host working directories, port mappings, volume mounts, and maintenance commands across Server 0149 and any related nodes.
