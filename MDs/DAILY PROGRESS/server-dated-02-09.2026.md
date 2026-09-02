@@ -25,9 +25,9 @@
 
 ## 3. Cloudflare DNS Configuration
 
-- **Domain / Zone:** `dhanushuav.com`
+- **Domain / Zone:** `dhanushuav.in`
 - **Record Type:** `A`
-- **Subdomain:** `live` (`live.dhanushuav.com`)
+- **Subdomain:** `live` (`live.dhanushuav.in`)
 - **Target IPv4:** `14.97.37.70`
 - **Proxy Status:** **DNS Only (Grey Cloud)**
   *(Required for raw RTMP on port 1935 and WebRTC UDP on port 8889, which Cloudflare HTTP proxy does not route).*
@@ -36,6 +36,6 @@
 
 ## 4. Public Streaming Endpoints
 
-- **Web Dashboard:** `http://live.dhanushuav.com:8443` (or `:3000`)
-- **RTMP Ingest URL:** `rtmp://live.dhanushuav.com:1935/live/{5-DIGIT-STREAM-KEY}`
+- **Web Dashboard:** `http://live.dhanushuav.in:8443` (or `:3000`)
+- **RTMP Ingest URL:** `rtmp://live.dhanushuav.in:1935/live/{5-DIGIT-STREAM-KEY}`
 - **WebRTC WHEP Playback:** Proxied internally via Web Dashboard on `/whep/live/{STREAM-KEY}`
