@@ -11,6 +11,7 @@ streamsRouter.use(requireAuth);
 const mediamtxApiUrl = process.env.MEDIAMTX_API || "http://mediamtx:9997";
 const publicHost = process.env.PUBLIC_HOST || "localhost";
 const publicDomain = process.env.PUBLIC_DOMAIN || "live.dhanushuav.in";
+const rtmpHost = process.env.RTMP_HOST || (publicDomain.startsWith("live.") ? "rtmp." + publicDomain.replace(/^live\./, "") : publicDomain);
 
 interface MediaMTXPathItem {
   name: string;
@@ -103,9 +104,9 @@ streamsRouter.get("/", async (req: Request, res: Response) => {
       rtsp_url: `rtsp://${publicHost}:8554/live/${s.stream_key}`,
       webrtc_url: `http://${publicHost}:8889/live/${s.stream_key}/whep`,
       hls_url: `http://${publicHost}:8888/live/${s.stream_key}/index.m3u8`,
-      obs_server: `rtmp://${publicDomain}:1935/live`,
+      obs_server: `rtmp://${rtmpHost}:1935/live`,
       obs_key: s.stream_key,
-      domain_rtmp: `rtmp://${publicDomain}:1935/live/${s.stream_key}`,
+      domain_rtmp: `rtmp://${rtmpHost}:1935/live/${s.stream_key}`,
       domain_hls: `https://${publicDomain}/hls/live/${s.stream_key}/index.m3u8`,
       domain_webrtc: `https://${publicDomain}/whep/live/${s.stream_key}/whep`,
     };
@@ -154,9 +155,9 @@ streamsRouter.get("/:idOrKey", async (req: Request, res: Response) => {
     rtsp_url: `rtsp://${publicHost}:8554/live/${stream.stream_key}`,
     webrtc_url: `http://${publicHost}:8889/live/${stream.stream_key}/whep`,
     hls_url: `http://${publicHost}:8888/live/${stream.stream_key}/index.m3u8`,
-    obs_server: `rtmp://${publicDomain}:1935/live`,
+    obs_server: `rtmp://${rtmpHost}:1935/live`,
     obs_key: stream.stream_key,
-    domain_rtmp: `rtmp://${publicDomain}:1935/live/${stream.stream_key}`,
+    domain_rtmp: `rtmp://${rtmpHost}:1935/live/${stream.stream_key}`,
     domain_hls: `https://${publicDomain}/hls/live/${stream.stream_key}/index.m3u8`,
     domain_webrtc: `https://${publicDomain}/whep/live/${stream.stream_key}/whep`,
     recordings,
@@ -193,10 +194,10 @@ streamsRouter.post("/", requireAuth, (req: Request, res: Response) => {
       is_active: true,
       is_public: Boolean(is_public),
       auto_record: Boolean(auto_record),
-      obs_server: `rtmp://${publicDomain}:1935/live`,
+      obs_server: `rtmp://${rtmpHost}:1935/live`,
       obs_key: key,
       rtmp_url: `rtmp://${publicHost}:1935/live/${key}`,
-      domain_rtmp: `rtmp://${publicDomain}:1935/live/${key}`,
+      domain_rtmp: `rtmp://${rtmpHost}:1935/live/${key}`,
     });
   } catch (err: any) {
     if (err.message && err.message.includes("UNIQUE")) {
