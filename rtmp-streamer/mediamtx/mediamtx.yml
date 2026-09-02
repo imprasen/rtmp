@@ -20,6 +20,7 @@ webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8889
 webrtcAllowOrigins: ["*"]
+webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]
 
 # HLS - Universal Low Latency fallback playback
 hls: yes
