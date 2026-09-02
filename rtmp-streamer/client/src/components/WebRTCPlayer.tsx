@@ -6,6 +6,7 @@ interface WebRTCPlayerProps {
   autoPlay?: boolean;
   muted?: boolean;
   showControls?: boolean;
+  onError?: () => void;
 }
 
 export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
@@ -13,6 +14,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   autoPlay = true,
   muted = true,
   showControls = true,
+  onError,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -91,8 +93,17 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
         } else if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           setStatus("failed");
           if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+          onError?.();
         }
       };
+
+      // Fall back to HLS if WebRTC UDP connection is blocked or timed out
+      const connectionWatchdog = window.setTimeout(() => {
+        if (pc.connectionState !== "connected") {
+          console.warn("[WebRTC] UDP connection timed out, falling back to HLS");
+          onError?.();
+        }
+      }, 5000);
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -114,6 +125,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
     } catch (err: any) {
       setStatus("failed");
+      onError?.();
 
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = window.setTimeout(() => {
