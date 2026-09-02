@@ -1,7 +1,7 @@
 # Caddy reverse proxy configuration
 # Automatically obtains Let's Encrypt TLS certificate for live.dhanushuav.com
 
-live.dhanushuav.com {
+live.dhanushuav.in, live.dhanushuav.com {
     # 1. API Endpoints
     handle /api/* {
         reverse_proxy server:5011

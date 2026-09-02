@@ -47,7 +47,7 @@ const configuredOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : [];
 
-const publicDomain = process.env.PUBLIC_DOMAIN || "live.dhanushuav.com";
+const publicDomain = process.env.PUBLIC_DOMAIN || "live.dhanushuav.in";
 
 const defaultAllowedOrigins = [
   "http://localhost:3000",
