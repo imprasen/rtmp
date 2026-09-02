@@ -24,11 +24,14 @@
 - **Container Name:** `rtmp-client`
 - **Internal Port:** `80/tcp` (Nginx)
 - **Host Exposed Port:** `0.0.0.0:3000` (All interfaces on Server 0149)
-- **Internal Proxy Routes (defined in `nginx/default.conf`):**
-  - `/` ──► React static build (`/usr/share/nginx/html`)
-  - `/api/` ──► `http://server:5011` (Node.js API)
+- **Mounted Volumes:**
+  - `./client/nginx.conf:/etc/nginx/conf.d/default.conf:ro` (Live Nginx config reload without image rebuild)
+- **Internal Proxy Routes (defined in `client/nginx.conf`):**
+  - `/` ──► React 18 static build (`/usr/share/nginx/html`)
+  - `/api/` ──► `http://server:5011` (Node.js API with `proxy_buffering off` for video streams)
   - `/whep/` ──► `http://mediamtx:8889` (WebRTC signaling)
   - `/hls/` ──► `http://mediamtx:8888` (HLS video stream)
+  - `/live/` ──► `http://mediamtx:8888` (Direct HLS playlists & `.ts` segments)
 
 ---
 
@@ -43,7 +46,8 @@
   - `PORT=5011`
   - `NODE_ENV=production`
   - `MEDIAMTX_API=http://mediamtx:9997`
-  - `PUBLIC_DOMAIN=live.dhanushuav.com`
+  - `PUBLIC_DOMAIN=live.dhanushuav.in`
+  - `RTMP_HOST=rtmp.dhanushuav.in`
   - `ALLOWED_ORIGINS` (Dynamic CORS validation for Tailscale, LAN, and public domain)
 
 ---
@@ -58,6 +62,7 @@
   - `8889:8889/udp` ──► WebRTC Media UDP Transport
   - `127.0.0.1:9997:9997/tcp` ──► MediaMTX Control API (Internal only)
 - **Configuration File:** `/opt/rtmp/rtmp-streamer/mediamtx/mediamtx.yml`
+- **NAT Traversal:** `webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]`
 - **Storage Volume:** `/opt/rtmp/rtmp-streamer/recordings:/recordings`
 
 ---

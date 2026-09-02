@@ -13,29 +13,32 @@
 
 ---
 
-## 2. New Firewall Port Forwarding (DNAT) Rules
-
-| Rule No. | Status | Incoming Zone | Incoming Interface | Protocol | External Port | Destination IP | Destination Port | Service / Purpose |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Rule 10** | Enabled | `wan` | `enp2s0 (Wan)` | `tcp` (or `all`) | **`1935`** | `172.16.3.50` | `1935` | RTMP Live Video Ingest (Drones / OBS) |
-| **Rule 11** | Enabled | `wan` | `enp2s0 (Wan)` | `tcp` | **`8443`** *(or `3000`)* | `172.16.3.50` | `3000` | Web Dashboard & Video Player |
-| **Rule 12** | Enabled | `wan` | `enp2s0 (Wan)` | `all` | **`8889`** | `172.16.3.50` | `8889` | WebRTC (WHEP) Ultra-Low Latency Media |
+## 2. Firewall Port Forwarding (DNAT) Status
+- Rule 10: Port `1935` ──► `172.16.3.50:1935` (`DNAT_RTMP_0149`) — **Active & Verified** (OBS & DJI GO 4 RTMP ingest working).
+- Rule 11: Port `8443` ──► `172.16.3.50:3000` (`DNAT_Web_0149`) — **Active & Verified** (Web dashboard and HLS video streaming working).
 
 ---
 
-## 3. Cloudflare DNS Configuration
+## 3. Cloudflare Architecture & DNS Records
 
-- **Domain / Zone:** `dhanushuav.in`
-- **Record Type:** `A`
-- **Subdomain:** `live` (`live.dhanushuav.in`)
-- **Target IPv4:** `14.97.37.70`
-- **Proxy Status:** **DNS Only (Grey Cloud)**
-  *(Required for raw RTMP on port 1935 and WebRTC UDP on port 8889, which Cloudflare HTTP proxy does not route).*
+- **Primary Web Host:** `live.dhanushuav.in`
+  - **A Record:** `14.97.37.70`
+  - **Proxy Status:** **Orange Cloud (Proxied)**
+  - **Origin Rule:** Rewrite incoming HTTPS port 443 ──► Origin Port `8443`.
+  - **SSL:** Universal SSL active (green lock, zero cost).
+  - **Streaming Protocol:** LL-HLS (Low Latency HLS) over HTTPS port 443.
+
+- **Dedicated RTMP Ingest Host:** `rtmp.dhanushuav.in`
+  - **A Record:** `14.97.37.70`
+  - **Proxy Status:** **Grey Cloud (DNS Only)**
+  - **Protocol:** Raw TCP RTMP on port 1935. Unaffected by Cloudflare HTTP proxy.
 
 ---
 
-## 4. Public Streaming Endpoints
+## 4. Operational Endpoints Summary
 
-- **Web Dashboard:** `http://live.dhanushuav.in:8443` (or `:3000`)
-- **RTMP Ingest URL:** `rtmp://live.dhanushuav.in:1935/live/{5-DIGIT-STREAM-KEY}`
-- **WebRTC WHEP Playback:** Proxied internally via Web Dashboard on `/whep/live/{STREAM-KEY}`
+- **Web Dashboard:** `https://live.dhanushuav.in/`
+- **Multi-View Wallboard:** `https://live.dhanushuav.in/multiview`
+- **RTMP Ingest:** `rtmp://rtmp.dhanushuav.in:1935/live/{STREAM-KEY}`
+- **HLS Video Playback:** `https://live.dhanushuav.in/live/{STREAM-KEY}/index.m3u8`
+- **Rollback Procedure:** To disable public exposure, toggle Rule 10 and Rule 11 to `Disabled` in Firewall Port Forwarding. Switch Port g10 hardware ACL remains permanently isolating Server 0149 from the LAN.
