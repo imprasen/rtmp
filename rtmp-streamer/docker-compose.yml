@@ -44,6 +44,7 @@ services:
       - MEDIAMTX_API=http://mediamtx:9997
       - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
       - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-live.dhanushuav.com}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     depends_on:
       - mediamtx
 

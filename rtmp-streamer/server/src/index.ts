@@ -42,19 +42,62 @@ if (!fs.existsSync(recordingsDir)) {
   fs.mkdirSync(recordingsDir, { recursive: true });
 }
 
-// ========== P0-2: CORS — Whitelist specific origins ==========
-const allowedOrigins = process.env.ALLOWED_ORIGINS
+// ========== P0-2: CORS — Dynamic and Secure Origin Validation ==========
+const configuredOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : ["http://localhost:3000", "http://localhost:5173"];
+  : [];
+
+const publicDomain = process.env.PUBLIC_DOMAIN || "live.dhanushuav.com";
+
+const defaultAllowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  `https://${publicDomain}`,
+  `http://${publicDomain}`,
+  ...configuredOrigins,
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (server-to-server, curl, mobile apps)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
+
+      // Wildcard override if explicitly set
+      if (configuredOrigins.includes("*")) {
         return callback(null, true);
       }
+
+      // Check explicit allowed origins list
+      if (defaultAllowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Dynamic hostname validation
+      try {
+        const url = new URL(origin);
+        // Match public domain or subdomains on any port (e.g. :8443, :3000)
+        if (url.hostname === publicDomain || url.hostname.endsWith(`.${publicDomain}`)) {
+          return callback(null, true);
+        }
+        // Match Tailscale (100.x.x.x), Local LAN (172.16.x.x, 192.168.x.x, 10.x.x.x), WAN IP, localhost
+        if (
+          url.hostname === "localhost" ||
+          url.hostname === "127.0.0.1" ||
+          url.hostname.startsWith("100.") ||
+          url.hostname.startsWith("172.16.") ||
+          url.hostname.startsWith("192.168.") ||
+          url.hostname.startsWith("10.") ||
+          url.hostname === "14.97.37.70"
+        ) {
+          return callback(null, true);
+        }
+      } catch {
+        // Invalid URL format, fall through to rejection
+      }
+
       return callback(new Error("CORS: Origin not allowed"), false);
     },
     credentials: true,
