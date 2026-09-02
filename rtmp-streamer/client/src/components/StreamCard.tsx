@@ -13,16 +13,16 @@ export const StreamCard: React.FC<StreamCardProps> = ({ stream, isAdmin, onDelet
   const [copiedRtmp, setCopiedRtmp] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
 
-  const copyToClipboard = (text: string, isRtmp: boolean) => {
+  const [copiedServer, setCopiedServer] = useState(false);
+
+  const copyServer = (text: string) => {
     navigator.clipboard.writeText(text);
-    if (isRtmp) {
-      setCopiedRtmp(true);
-      setTimeout(() => setCopiedRtmp(false), 2000);
-    } else {
-      setCopiedKey(true);
-      setTimeout(() => setCopiedKey(false), 2000);
-    }
+    setCopiedServer(true);
+    setTimeout(() => setCopiedServer(false), 2000);
   };
+
+  const obsServerUrl = stream.obs_server || "rtmp://live.dhanushuav.in:1935/live";
+  const fullRtmpUrl = stream.domain_rtmp || stream.rtmp_url;
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden hover:border-emerald-500/50 dark:hover:border-slate-700 transition-all shadow-lg hover:shadow-xl group">
@@ -73,20 +73,44 @@ export const StreamCard: React.FC<StreamCardProps> = ({ stream, isAdmin, onDelet
       {/* Body Details */}
       <div className="p-5 space-y-4">
         {/* Ingest URL Box */}
-        <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
-            <span className="font-medium">RTMP Server Endpoint:</span>
-            <button
-              onClick={() => copyToClipboard(stream.domain_rtmp || stream.rtmp_url, true)}
-              className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono transition-colors font-semibold"
-            >
-              {copiedRtmp ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              {copiedRtmp ? "Copied!" : "Copy RTMP"}
-            </button>
+        <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2.5">
+          {/* OBS Server Field */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">OBS Server:</span>
+              <button
+                onClick={() => copyServer(obsServerUrl)}
+                className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono transition-colors text-[11px] font-semibold"
+              >
+                {copiedServer ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedServer ? "Copied!" : "Copy Server"}
+              </button>
+            </div>
+            <p className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-800 select-all">
+              {obsServerUrl}
+            </p>
           </div>
-          <p className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-800">
-            {stream.domain_rtmp || stream.rtmp_url}
-          </p>
+
+          {/* OBS Stream Key Field */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">Stream Key:</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(stream.stream_key);
+                  setCopiedKey(true);
+                  setTimeout(() => setCopiedKey(false), 2000);
+                }}
+                className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono transition-colors text-[11px] font-semibold"
+              >
+                {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedKey ? "Copied!" : "Copy Key"}
+              </button>
+            </div>
+            <p className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-800 select-all">
+              {stream.stream_key}
+            </p>
+          </div>
         </div>
 
         {/* Stats Grid */}

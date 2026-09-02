@@ -23,6 +23,8 @@ export interface StreamItem {
   domain_rtmp: string;
   domain_hls: string;
   domain_webrtc: string;
+  obs_server?: string;
+  obs_key?: string;
 }
 
 export interface RecordingItem {
