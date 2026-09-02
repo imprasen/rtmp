@@ -22,8 +22,8 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
       hlsRef.current = null;
     }
 
-    // Relative URL through Nginx reverse proxy
-    const src = `/hls/live/${streamKey}/index.m3u8`;
+    // Direct live HLS endpoint
+    const src = `/live/${streamKey}/index.m3u8`;
 
     if (Hls.isSupported()) {
       const hls = new Hls({

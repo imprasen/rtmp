@@ -48,7 +48,11 @@ export const StreamCard: React.FC<StreamCardProps> = ({ stream, isAdmin, onDelet
               Key: {stream.stream_key}
             </span>
             <button
-              onClick={() => copyToClipboard(stream.stream_key, false)}
+              onClick={() => {
+                navigator.clipboard.writeText(stream.stream_key);
+                setCopiedKey(true);
+                setTimeout(() => setCopiedKey(false), 2000);
+              }}
               className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               title="Copy 5-digit key"
             >
