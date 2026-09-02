@@ -1,13 +1,45 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { LayoutGrid, RefreshCw, Layers } from "lucide-react";
+import { LayoutGrid, RefreshCw, Layers, Zap, Radio } from "lucide-react";
 import { api, StreamItem } from "../services/api";
 import { WebRTCPlayer } from "../components/WebRTCPlayer";
+import { HLSPlayer } from "../components/HLSPlayer";
+
+interface MultiViewTileProps {
+  streamKey: string;
+  globalMode: "hls" | "webrtc";
+}
+
+const MultiViewTile: React.FC<MultiViewTileProps> = ({ streamKey, globalMode }) => {
+  const [tileMode, setTileMode] = useState<"hls" | "webrtc">(globalMode);
+
+  useEffect(() => {
+    setTileMode(globalMode);
+  }, [globalMode]);
+
+  return (
+    <div className="flex-1 bg-black aspect-video relative">
+      {tileMode === "webrtc" ? (
+        <WebRTCPlayer
+          streamKey={streamKey}
+          showControls={false}
+          onError={() => {
+            console.warn(`[MultiView] Tile #${streamKey} WebRTC failed, auto-falling back to LL-HLS`);
+            setTileMode("hls");
+          }}
+        />
+      ) : (
+        <HLSPlayer streamKey={streamKey} />
+      )}
+    </div>
+  );
+};
 
 export const MultiView: React.FC = () => {
   const [streams, setStreams] = useState<StreamItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [gridLayout, setGridLayout] = useState<"auto" | "2x2" | "3x3">("auto");
+  const [globalMode, setGlobalMode] = useState<"hls" | "webrtc">("hls");
 
   const fetchStreams = async () => {
     try {
@@ -56,7 +88,31 @@ export const MultiView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Protocol Switcher */}
+          <div className="bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center space-x-1 text-xs font-semibold">
+            <button
+              onClick={() => setGlobalMode("hls")}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
+                globalMode === "hls"
+                  ? "bg-amber-600 text-white shadow"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" /> LL-HLS (Reliable)
+            </button>
+            <button
+              onClick={() => setGlobalMode("webrtc")}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
+                globalMode === "webrtc"
+                  ? "bg-emerald-600 text-white shadow"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" /> WebRTC (&lt;500ms)
+            </button>
+          </div>
+
           {/* Grid Layout Selector */}
           <div className="bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center space-x-1 text-xs font-semibold">
             <button
@@ -149,10 +205,8 @@ export const MultiView: React.FC = () => {
                 )}
               </div>
 
-              {/* Video Tile */}
-              <div className="flex-1 bg-black aspect-video">
-                <WebRTCPlayer streamKey={stream.stream_key} showControls={true} />
-              </div>
+              {/* Video Tile with Auto-Fallback */}
+              <MultiViewTile streamKey={stream.stream_key} globalMode={globalMode} />
 
               {/* Tile Footer */}
               <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950/40 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
