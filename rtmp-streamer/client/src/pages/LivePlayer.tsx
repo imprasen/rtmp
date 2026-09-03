@@ -125,7 +125,7 @@ export const LivePlayer: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => copyToClipboard(stream?.domain_rtmp || `rtmp://localhost:1935/live/${streamKey}`, true)}
+              onClick={() => copyToClipboard(stream?.domain_rtmp || `rtmp://localhost:1935/ingest/${streamKey}`, true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors"
             >
               {copiedRtmp ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}

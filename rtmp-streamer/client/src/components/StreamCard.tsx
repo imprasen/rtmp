@@ -21,7 +21,7 @@ export const StreamCard: React.FC<StreamCardProps> = ({ stream, isAdmin, onDelet
     setTimeout(() => setCopiedServer(false), 2000);
   };
 
-  const obsServerUrl = stream.obs_server || "rtmp://rtmp.dhanushuav.in:1935/live";
+  const obsServerUrl = stream.obs_server || "rtmp://rtmp.dhanushuav.in:1935/ingest";
   const fullRtmpUrl = stream.domain_rtmp || stream.rtmp_url;
 
   return (

@@ -10,7 +10,7 @@ const retentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS || "7", 10);
 
 // P0-5: Sanitize stream key — remove any path traversal characters
 function sanitizeStreamKey(rawPath: string): string {
-  const key = (rawPath || "").replace(/^live\//, "");
+  const key = (rawPath || "").replace(/^(live|ingest)\//, "");
   // Strip anything that isn't alphanumeric, dash, or underscore
   return key.replace(/[^a-zA-Z0-9_-]/g, "");
 }
