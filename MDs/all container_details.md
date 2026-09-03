@@ -14,7 +14,7 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`rtmp-client`** | `rtmp-streamer-client` | `72396b1d547a` | `0.0.0.0:3000 -> 80/tcp` | Running | React 18 Frontend & Nginx API/Media Reverse Proxy |
 | **`rtmp-server`** | `rtmp-streamer-server` | `33ecff9b6f34` | `127.0.0.1:5011 -> 5011/tcp` | Running (healthy) | Node.js 22 REST API, SQLite DB, Auth & Session Engine |
-| **`rtmp-mediamtx`** | `bluenviron/mediamtx:latest` | `aa55fbc32c2e` | `1935/tcp`, `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | High-Performance Live Video Streaming Engine |
+| **`rtmp-mediamtx`** | `rtmp-streamer-mediamtx` (custom) | `aa55fbc32c2e` | `1935/tcp`, `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | High-Performance Live Video Engine + Real-time FFmpeg Auto-Transcoder |
 
 ---
 
@@ -52,16 +52,20 @@
 
 ---
 
-### C. `rtmp-mediamtx` (Media Engine)
+### C. `rtmp-mediamtx` (Media Engine + FFmpeg Transcoder)
 - **Container Name:** `rtmp-mediamtx`
+- **Base Image:** `bluenviron/mediamtx:latest` + Alpine `ffmpeg` (Built via `./mediamtx/Dockerfile`)
 - **Exposed Ports:**
-  - `1935:1935/tcp` ──► **RTMP Ingest** (Drone / OBS video push)
-  - `8554:8554/tcp` ──► RTSP Ingest & Playback
-  - `8888:8888/tcp` ──► HLS (LL-HLS) video stream
+  - `1935:1935/tcp` ──► **RTMP Ingest** (Drone / OBS video push to `ingest/*`)
+  - `8554:8554/tcp` ──► RTSP Ingest & Internal Transcoding Loopback
+  - `8888:8888/tcp` ──► HLS (LL-HLS) video stream (`live/*`)
   - `8889:8889/tcp` ──► WebRTC WHEP HTTP Signaling
   - `8889:8889/udp` ──► WebRTC Media UDP Transport
   - `127.0.0.1:9997:9997/tcp` ──► MediaMTX Control API (Internal only)
 - **Configuration File:** `/opt/rtmp/rtmp-streamer/mediamtx/mediamtx.yml`
+- **Real-Time Auto-Transcoding Pipeline:**
+  - Ingest URL: `rtmp://rtmp.dhanushuav.in:1935/ingest/{STREAM-KEY}`
+  - FFmpeg Hook: Scales & pads any non-standard video (e.g. DJI `1080x720`) to standard `1280x720` with 16-pixel macroblock alignment, GOP 30, and republishes to `live/{STREAM-KEY}`.
 - **NAT Traversal:** `webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]`
 - **Storage Volume:** `/opt/rtmp/rtmp-streamer/recordings:/recordings`
 
@@ -81,9 +85,9 @@ docker compose ps
 # View container logs
 docker compose logs -f [server|client|mediamtx]
 
-# Pull latest code & rebuild
+# Pull latest code & rebuild all services
 git pull origin main
-docker compose build server client
+docker compose build mediamtx client server
 docker compose up -d
 
 # Restart all containers
