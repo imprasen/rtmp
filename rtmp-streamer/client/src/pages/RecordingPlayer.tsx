@@ -1,20 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, ShieldCheck, Clock, Trash2, HardDrive, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Clock, Trash2, HardDrive, AlertCircle, Gauge, RotateCcw, RotateCw } from "lucide-react";
 import { api, RecordingItem, UserState } from "../services/api";
 
 interface RecordingPlayerProps {
   userState: UserState;
 }
 
+const SPEED_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
 export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [recording, setRecording] = useState<RecordingItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [customDays, setCustomDays] = useState<number>(7);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
 
   const fetchRecording = async () => {
     try {
@@ -30,6 +34,40 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
   useEffect(() => {
     fetchRecording();
   }, [id]);
+
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackRate(speed);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+    }
+  };
+
+  const handleSeek = (offsetSeconds: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + offsetSeconds);
+    }
+  };
+
+  // Keyboard navigation for playback speed and seeking
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input/select
+      if (["INPUT", "SELECT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if (e.key === "]" || e.key === ">") {
+        const nextSpeed = SPEED_PRESETS.find((s) => s > playbackRate) || SPEED_PRESETS[SPEED_PRESETS.length - 1];
+        handleSpeedChange(nextSpeed);
+      } else if (e.key === "[" || e.key === "<") {
+        const prevSpeed = [...SPEED_PRESETS].reverse().find((s) => s < playbackRate) || SPEED_PRESETS[0];
+        handleSpeedChange(prevSpeed);
+      } else if (e.key === "0") {
+        handleSpeedChange(1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [playbackRate]);
 
   const handleToggleKeep = async () => {
     if (!recording) return;
@@ -111,16 +149,74 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
         )}
       </div>
 
-      {/* Video Player */}
-      <div className="mt-6 bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 aspect-video">
+      {/* Video Player Card */}
+      <div className="mt-6 relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 aspect-video group">
+        {/* Floating Speed Indicator Badge */}
+        {playbackRate !== 1 && (
+          <div className="absolute top-4 right-4 z-10 bg-black/80 backdrop-blur border border-emerald-500/50 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-xl pointer-events-none">
+            <Gauge className="w-3.5 h-3.5" />
+            <span>{playbackRate}x Speed</span>
+          </div>
+        )}
+
         <video
+          ref={videoRef}
           controls
           autoPlay
+          preload="auto"
+          playsInline
           className="w-full h-full object-contain bg-black"
           src={recording.stream_url}
+          onLoadedMetadata={(e) => {
+            (e.target as HTMLVideoElement).playbackRate = playbackRate;
+          }}
         >
           Your browser does not support HTML5 MP4 video playback.
         </video>
+      </div>
+
+      {/* Playback Speed & Fast Flight Navigation Control Bar */}
+      <div className="mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 px-5 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+        {/* Playback Speed Selector */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+            <Gauge className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Speed:
+          </span>
+          <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+            {SPEED_PRESETS.map((speed) => (
+              <button
+                key={speed}
+                onClick={() => handleSpeedChange(speed)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  playbackRate === speed
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-105"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800/60"
+                }`}
+                title={`Play video at ${speed}x speed`}
+              >
+                {speed === 1 ? "1.0x (Normal)" : `${speed}x`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Skip Buttons (-10s / +10s) */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleSeek(-10)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors"
+            title="Rewind 10 seconds"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> -10s
+          </button>
+          <button
+            onClick={() => handleSeek(10)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors"
+            title="Skip forward 10 seconds"
+          >
+            +10s <RotateCw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          </button>
+        </div>
       </div>
 
       {/* Flight Video Metadata & Actions Bar */}
