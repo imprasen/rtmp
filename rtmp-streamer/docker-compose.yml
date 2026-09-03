@@ -5,9 +5,7 @@
 services:
   # 1. MediaMTX: Media server (RTMP, WebRTC, HLS, RTSP)
   mediamtx:
-    build:
-      context: ./mediamtx
-      dockerfile: Dockerfile
+    image: bluenviron/mediamtx:latest-ffmpeg
     container_name: rtmp-mediamtx
     restart: unless-stopped
     ports:

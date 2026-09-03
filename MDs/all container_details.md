@@ -14,7 +14,7 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`rtmp-client`** | `rtmp-streamer-client` | `72396b1d547a` | `0.0.0.0:3000 -> 80/tcp` | Running | React 18 Frontend & Nginx API/Media Reverse Proxy |
 | **`rtmp-server`** | `rtmp-streamer-server` | `33ecff9b6f34` | `127.0.0.1:5011 -> 5011/tcp` | Running (healthy) | Node.js 22 REST API, SQLite DB, Auth & Session Engine |
-| **`rtmp-mediamtx`** | `rtmp-streamer-mediamtx` (custom) | `aa55fbc32c2e` | `1935/tcp`, `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | High-Performance Live Video Engine + Real-time FFmpeg Auto-Transcoder |
+| **`rtmp-mediamtx`** | `bluenviron/mediamtx:latest-ffmpeg` | `aa55fbc32c2e` | `1935/tcp`, `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | Official MediaMTX Engine with Pre-installed FFmpeg Auto-Transcoder |
 
 ---
 
@@ -54,7 +54,7 @@
 
 ### C. `rtmp-mediamtx` (Media Engine + FFmpeg Transcoder)
 - **Container Name:** `rtmp-mediamtx`
-- **Base Image:** `bluenviron/mediamtx:latest` + Alpine `ffmpeg` (Built via `./mediamtx/Dockerfile`)
+- **Base Image:** `bluenviron/mediamtx:latest-ffmpeg` (Official MediaMTX image with built-in FFmpeg)
 - **Exposed Ports:**
   - `1935:1935/tcp` ──► **RTMP Ingest** (Drone / OBS video push to `ingest/*`)
   - `8554:8554/tcp` ──► RTSP Ingest & Internal Transcoding Loopback
@@ -85,9 +85,9 @@ docker compose ps
 # View container logs
 docker compose logs -f [server|client|mediamtx]
 
-# Pull latest code & rebuild all services
+# Pull latest code & update containers
 git pull origin main
-docker compose build mediamtx client server
+docker compose build client server
 docker compose up -d
 
 # Restart all containers
