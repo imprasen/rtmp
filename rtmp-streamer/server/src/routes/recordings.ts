@@ -246,38 +246,59 @@ recordingsRouter.get("/:id/stream", (req: Request, res: Response) => {
   const fileSize = stat.size;
   const range = req.headers.range;
 
+  // Optimized chunk size for instant VOD start:
+  // Serving open-ended requests (e.g. bytes=0-) in 3 MB chunks lets the browser
+  // receive the MP4 headers and first GOP in ~20-50ms instead of waiting for hundreds of MBs.
+  const CHUNK_SIZE = 3 * 1024 * 1024; // 3 MB chunk for instant start
+
   if (range) {
     const parts = range.replace(/bytes=/, "").split("-");
     const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
-    // Validate range values
-    if (isNaN(start) || isNaN(end) || start < 0 || end >= fileSize || start > end) {
+    if (isNaN(start) || start < 0 || start >= fileSize) {
       res.setHeader("Content-Range", `bytes */${fileSize}`);
       return res.status(416).json({ error: "Range not satisfiable" });
     }
 
+    // If browser requested an explicit end (e.g. bytes=0-1024), respect it.
+    // Otherwise, cap to CHUNK_SIZE for instant startup and low latency seeking.
+    let end = parts[1] && parts[1].trim().length > 0 ? parseInt(parts[1], 10) : start + CHUNK_SIZE - 1;
+
+    if (isNaN(end) || end < start) {
+      end = start + CHUNK_SIZE - 1;
+    }
+    if (end >= fileSize) {
+      end = fileSize - 1;
+    }
+
     const chunksize = end - start + 1;
-    const file = fs.createReadStream(recording.filepath, { start, end });
+    const file = fs.createReadStream(recording.filepath, { start, end, highWaterMark: 64 * 1024 });
     const head = {
       "Content-Range": `bytes ${start}-${end}/${fileSize}`,
       "Accept-Ranges": "bytes",
       "Content-Length": chunksize,
       "Content-Type": "video/mp4",
+      "Cache-Control": "public, max-age=86400, no-transform",
     };
     res.writeHead(206, head);
     file.on("error", () => res.end());
     file.pipe(res);
   } else {
+    // If no range header sent, deliver the first chunk as 206 Partial Content
+    // so HTML5 video players immediately recognize byte ranges and start playing.
+    const end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
+    const chunksize = end + 1;
+    const file = fs.createReadStream(recording.filepath, { start: 0, end, highWaterMark: 64 * 1024 });
     const head = {
-      "Content-Length": fileSize,
-      "Content-Type": "video/mp4",
+      "Content-Range": `bytes 0-${end}/${fileSize}`,
       "Accept-Ranges": "bytes",
+      "Content-Length": chunksize,
+      "Content-Type": "video/mp4",
+      "Cache-Control": "public, max-age=86400, no-transform",
     };
-    res.writeHead(200, head);
-    const stream = fs.createReadStream(recording.filepath);
-    stream.on("error", () => res.end());
-    stream.pipe(res);
+    res.writeHead(206, head);
+    file.on("error", () => res.end());
+    file.pipe(res);
   }
 });
 
