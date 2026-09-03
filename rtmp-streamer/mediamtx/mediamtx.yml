@@ -45,7 +45,18 @@ authHTTPAddress: http://server:5011/api/hooks/auth
 # Paths Configuration
 ###############################################
 paths:
-  # Path pattern matching all streams under live/*
+  # ── INGEST paths: Drones / OBS publish here ──
+  # FFmpeg auto-transcodes to standard 1280x720 and republishes to live/*
+  ~^ingest/.*$:
+    runOnReady: >
+      ffmpeg -i rtsp://localhost:8554/$MTX_PATH
+      -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2"
+      -c:v libx264 -preset ultrafast -tune zerolatency -g 30 -keyint_min 30 -b:v 2500k -maxrate 3000k -bufsize 5000k
+      -c:a aac -b:a 128k -ar 44100 -ac 2
+      -f rtsp rtsp://localhost:8554/${MTX_PATH/ingest/live}
+    runOnReadyRestart: yes
+
+  # ── LIVE paths: Transcoded output + Web playback + Recording ──
   ~^live/.*$:
     # Auto-record flight as ONE single continuous MP4 file (up to 6 hours)
     record: yes
