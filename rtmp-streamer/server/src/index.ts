@@ -12,6 +12,7 @@ import { streamsRouter } from "./routes/streams.js";
 import { recordingsRouter } from "./routes/recordings.js";
 import { hooksRouter } from "./routes/hooks.js";
 import { usersRouter } from "./routes/users.js";
+import { optimizeAllRecordingsOnStartup } from "./utils/faststart.js";
 
 dotenv.config();
 
@@ -147,6 +148,10 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // Graceful shutdown
 const server = app.listen(port, "0.0.0.0", () => {
   console.log(`[SERVER] RTMP API Server running on http://0.0.0.0:${port}`);
+  // Asynchronously pre-optimize any existing recordings so all historical VODs start instantly
+  optimizeAllRecordingsOnStartup().catch((err) => {
+    console.error("[STARTUP OPTIMIZER] Error:", err);
+  });
 });
 
 const shutdown = () => {

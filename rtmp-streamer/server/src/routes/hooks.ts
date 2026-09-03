@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { db } from "../db.js";
+import { ensureFaststart } from "../utils/faststart.js";
 
 export const hooksRouter = Router();
 
@@ -155,18 +156,22 @@ hooksRouter.post("/on-unpublish", (req: Request, res: Response) => {
     );
 
     if (stream.auto_record) {
-      setTimeout(() => {
+      setTimeout(async () => {
         const latestFile = findLatestRecordingFile(streamKey);
         if (latestFile && latestFile.size > 1024) {
           const existing = db.prepare("SELECT id FROM recordings WHERE filepath = ?").get(latestFile.filepath);
           if (!existing) {
+            // Automatically pre-remux to progressive faststart MP4 for instant web playback
+            await ensureFaststart(latestFile.filepath);
+            const finalSize = fs.existsSync(latestFile.filepath) ? fs.statSync(latestFile.filepath).size : latestFile.size;
+
             // P0-8: Compute expiry date in JS instead of SQL template interpolation
             const expiresAt = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
             db.prepare(`
               INSERT INTO recordings (stream_id, stream_key, filename, filepath, file_size, expires_at)
               VALUES (?, ?, ?, ?, ?, ?)
-            `).run(stream.id, streamKey, latestFile.filename, latestFile.filepath, latestFile.size, expiresAt);
-            console.log(`[RECORDING] Registered new drone recording: ${latestFile.filename} (${(latestFile.size / 1024 / 1024).toFixed(2)} MB)`);
+            `).run(stream.id, streamKey, latestFile.filename, latestFile.filepath, finalSize, expiresAt);
+            console.log(`[RECORDING] Registered new web-optimized drone recording: ${latestFile.filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
           }
         }
       }, 2000);
