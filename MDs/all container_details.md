@@ -4,7 +4,7 @@
 **Tailscale IP:** `100.118.109.5`  
 **Host Project Working Directory:** `/opt/rtmp/rtmp-streamer`  
 **Compose File:** `/opt/rtmp/rtmp-streamer/docker-compose.yml`  
-**Last Updated:** 02-09-2026  
+**Last Updated:** 05-09-2026  
 
 ---
 
@@ -56,7 +56,9 @@
 - **Container Name:** `rtmp-mediamtx`
 - **Base Image:** `bluenviron/mediamtx:latest-ffmpeg` (Official MediaMTX image with built-in FFmpeg)
 - **Exposed Ports:**
-  - `1935:1935/tcp` ──► **RTMP Ingest** (Drone / OBS video push to `ingest/*`)
+  - `1935:1935/tcp` ──► **RTMP Direct (`live/*`) & Ingest (`ingest/*`)**
+    - Direct Publish: `rtmp://rtmp.dhanushuav.in:1935/live/{STREAM-KEY}` (OBS Studio, lowest latency)
+    - Auto-Transcode: `rtmp://rtmp.dhanushuav.in:1935/ingest/{STREAM-KEY}` (DJI GO 4 drones)
   - `8554:8554/tcp` ──► RTSP Ingest & Internal Transcoding Loopback
   - `8888:8888/tcp` ──► HLS (LL-HLS) video stream (`live/*`)
   - `8889:8889/tcp` ──► WebRTC WHEP HTTP Signaling
@@ -65,7 +67,7 @@
 - **Configuration File:** `/opt/rtmp/rtmp-streamer/mediamtx/mediamtx.yml`
 - **Real-Time Auto-Transcoding Pipeline:**
   - Ingest URL: `rtmp://rtmp.dhanushuav.in:1935/ingest/{STREAM-KEY}`
-  - FFmpeg Hook: Scales & pads any non-standard video (e.g. DJI `1080x720`) to standard `1280x720` with 16-pixel macroblock alignment, GOP 30, and republishes to `live/{STREAM-KEY}`.
+  - FFmpeg Hook (`sh -c`): Scales & pads any non-standard video (e.g. DJI `1080x720`) to standard `1280x720` with 16-pixel macroblock alignment, GOP 30, and republishes to `live/{STREAM-KEY}`.
 - **NAT Traversal:** `webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]`
 - **Storage Volume:** `/opt/rtmp/rtmp-streamer/recordings:/recordings`
 
