@@ -2,16 +2,19 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { db } from "../db.js";
+import { requireAuth } from "../middleware/optionalAuth.js";
 import { ensureFaststart } from "../utils/faststart.js";
+import { logFieldAuth, getRecentFieldLogs, clearFieldLogs } from "../utils/fieldLogger.js";
 
 export const hooksRouter = Router();
 
 const recordingsBaseDir = process.env.RECORDING_PATH || "/recordings";
 const retentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS || "7", 10);
 
-// P0-5: Sanitize stream key — remove any path traversal characters
+// P0-5: Sanitize stream key — remove any path traversal characters and normalize
 function sanitizeStreamKey(rawPath: string): string {
-  const key = (rawPath || "").replace(/^(live|ingest)\//, "");
+  const trimmed = (rawPath || "").trim().replace(/^\/+|\/+$/g, "");
+  const key = trimmed.replace(/^(live|ingest)\//, "");
   // Strip anything that isn't alphanumeric, dash, or underscore
   return key.replace(/[^a-zA-Z0-9_-]/g, "");
 }
@@ -66,32 +69,130 @@ function findLatestRecordingFile(streamKey: string): { filename: string; filepat
   }
 }
 
+// Diagnostic API endpoints for field debugging
+hooksRouter.get("/field-logs", requireAuth, (req: Request, res: Response) => {
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+  return res.json({
+    ok: true,
+    logs: getRecentFieldLogs(limit),
+  });
+});
+
+hooksRouter.post("/field-logs/clear", requireAuth, (req: Request, res: Response) => {
+  clearFieldLogs();
+  return res.json({ ok: true, message: "Field diagnostic logs cleared" });
+});
+
 // 1. MediaMTX Authentication Webhook (Called on every publish / read)
 hooksRouter.post("/auth", (req: Request, res: Response) => {
-  // P0-7: Only accept hook calls from Docker internal network
-  if (!isInternalRequest(req)) {
+  const callerIp = req.ip || req.socket.remoteAddress || "";
+  const isAllowedInternal = isInternalRequest(req);
+
+  const { action, path: streamPath, ip: clientIp, query } = req.body;
+  const rawPath = streamPath || "";
+  let streamKey = sanitizeStreamKey(rawPath);
+
+  // If caller is not internal Docker bridge, log rejection and return 403
+  if (!isAllowedInternal) {
+    console.warn(`[AUTH HOOK] REJECTED non-internal request from ${callerIp}`);
+    logFieldAuth({
+      action: action || "unknown",
+      rawPath,
+      sanitizedKey: streamKey,
+      clientIp: clientIp || "unknown",
+      callerIp,
+      isInternalAllowed: false,
+      dbMatched: false,
+      decision: "REJECTED",
+      statusCode: 403,
+      reason: `Caller IP ${callerIp} is not in Docker internal network subnet`,
+      rawBody: req.body,
+    });
     return res.status(403).json({ error: "Forbidden: external hook calls are not allowed" });
   }
 
-  const { action, path: streamPath, ip } = req.body;
-  const streamKey = sanitizeStreamKey(streamPath);
-
-  console.log(`[AUTH HOOK] Action: ${action}, Path: ${streamPath}, IP: ${ip}`);
+  console.log(`[AUTH HOOK] Action: ${action}, Path: "${rawPath}", ClientIP: ${clientIp}, CallerIP: ${callerIp}`);
 
   if (action === "publish") {
-    const stream = db.prepare("SELECT * FROM streams WHERE stream_key = ? AND is_active = 1").get(streamKey) as any;
+    // 1. Look up stream by sanitized key
+    let stream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(streamKey) as any;
 
-    if (!stream) {
-      console.warn(`[AUTH HOOK] REJECTED publish for key: ${streamKey} from IP ${ip}`);
-      return res.status(401).json({ error: "Invalid or inactive stream key" });
+    // 2. Fallback: Check if client passed nested path (e.g. "live/drone/48862" or "live/48862/")
+    if (!stream && rawPath.includes("/")) {
+      const parts = rawPath.split("/").filter(Boolean);
+      for (const part of parts) {
+        const candidateKey = part.replace(/[^a-zA-Z0-9_-]/g, "");
+        if (candidateKey) {
+          const candidateStream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(candidateKey) as any;
+          if (candidateStream) {
+            stream = candidateStream;
+            streamKey = candidateKey;
+            console.log(`[AUTH HOOK] Matched stream key from subpath segment: "${candidateKey}"`);
+            break;
+          }
+        }
+      }
     }
 
-    console.log(`[AUTH HOOK] ACCEPTED publish for stream: "${stream.name}" (${streamKey}) from IP ${ip}`);
+    if (!stream) {
+      console.warn(`[AUTH HOOK] REJECTED publish: key "${streamKey}" (raw: "${rawPath}") from client IP ${clientIp} not found in DB`);
+      logFieldAuth({
+        action: "publish",
+        rawPath,
+        sanitizedKey: streamKey,
+        clientIp: clientIp || "unknown",
+        callerIp,
+        isInternalAllowed: true,
+        dbMatched: false,
+        decision: "REJECTED",
+        statusCode: 401,
+        reason: `Stream key "${streamKey}" does not exist in database`,
+        rawBody: req.body,
+      });
+      return res.status(401).json({ error: "Invalid stream key" });
+    }
+
+    if (!stream.is_active) {
+      console.warn(`[AUTH HOOK] REJECTED publish: stream "${stream.name}" (${streamKey}) is DEACTIVATED`);
+      logFieldAuth({
+        action: "publish",
+        rawPath,
+        sanitizedKey: streamKey,
+        clientIp: clientIp || "unknown",
+        callerIp,
+        isInternalAllowed: true,
+        dbMatched: true,
+        streamName: stream.name,
+        isActive: false,
+        decision: "REJECTED",
+        statusCode: 401,
+        reason: `Stream "${stream.name}" (${streamKey}) is inactive in dashboard`,
+        rawBody: req.body,
+      });
+      return res.status(401).json({ error: "Stream key is inactive" });
+    }
+
+    console.log(`[AUTH HOOK] ACCEPTED publish for stream: "${stream.name}" (${streamKey}) from client IP ${clientIp}`);
+    logFieldAuth({
+      action: "publish",
+      rawPath,
+      sanitizedKey: streamKey,
+      clientIp: clientIp || "unknown",
+      callerIp,
+      isInternalAllowed: true,
+      dbMatched: true,
+      streamName: stream.name,
+      isActive: true,
+      decision: "ACCEPTED",
+      statusCode: 200,
+      reason: `Authorized stream "${stream.name}"`,
+      rawBody: req.body,
+    });
 
     db.prepare("INSERT INTO stream_logs (stream_id, stream_key, event, client_ip) VALUES (?, ?, 'publish_start', ?)").run(
       stream.id,
       streamKey,
-      ip
+      clientIp
     );
 
     return res.status(200).json({ ok: true });

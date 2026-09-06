@@ -2,8 +2,10 @@
 # Optimized for Ultra-Low Latency Drone Live Streaming & Auto-Recording
 
 ###############################################
-# Protocol Listeners
+# Logging Configuration (Field Debugging)
 ###############################################
+logLevel: debug
+logDestinations: [stdout]
 
 # RTMP Ingest (Drone / OBS push)
 rtmp: yes
