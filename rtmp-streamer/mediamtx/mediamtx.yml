@@ -7,10 +7,14 @@
 logLevel: debug
 logDestinations: [stdout]
 
-# RTMP Ingest (Drone / OBS push)
-rtmp: yes
-rtmpAddress: :1935
-rtmpEncryption: "no"
+###############################################
+# Protocol Listeners
+###############################################
+
+# RTMP — DISABLED: nginx-rtmp handles RTMP ingest and relays to MediaMTX via RTSP
+# This fixes DJI RS 2 "received a packet for video track 0, but track is not set up"
+rtmp: no
+# rtmpAddress: :1935
 
 # RTSP Ingest/Egress
 rtsp: yes
@@ -38,28 +42,17 @@ api: yes
 apiAddress: :9997
 
 ###############################################
-# Authentication Hook
+# Authentication — DISABLED for RTSP ingest from nginx-rtmp
+# nginx-rtmp validates stream keys via on_publish callback BEFORE relaying here
 ###############################################
-authMethod: http
-authHTTPAddress: http://server:5011/api/hooks/auth
+# authMethod: http
+# authHTTPAddress: http://server:5011/api/hooks/auth
 
 ###############################################
 # Paths Configuration
 ###############################################
 paths:
-  # ── INGEST paths: DJI drones publish here for auto-transcoding ──
-  # FFmpeg auto-transcodes non-standard resolutions to clean 1280x720 and republishes to live/*
-  ~^ingest/.*$:
-    runOnReady: >
-      sh -c 'LIVE_PATH=$(echo $MTX_PATH | sed "s/ingest/live/");
-      ffmpeg -i rtsp://localhost:8554/$MTX_PATH
-      -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2"
-      -c:v libx264 -preset ultrafast -tune zerolatency -g 30 -keyint_min 30 -b:v 2500k -maxrate 3000k -bufsize 5000k
-      -c:a aac -b:a 128k -ar 44100 -ac 2
-      -f rtsp rtsp://localhost:8554/$LIVE_PATH'
-    runOnReadyRestart: yes
-
-  # ── LIVE paths: OBS/direct publishers + Transcoded drone output + Web playback + Recording ──
+  # ── LIVE paths: Receives RTSP relay from nginx-rtmp + Web playback + Recording ──
   ~^live/.*$:
     # Auto-record flight as ONE single continuous MP4 file (up to 6 hours)
     record: yes

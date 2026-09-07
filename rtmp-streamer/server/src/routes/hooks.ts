@@ -91,6 +91,146 @@ hooksRouter.post("/field-logs/clear", requireAuth, (req: Request, res: Response)
   return res.json({ ok: true, message: "Field diagnostic logs cleared" });
 });
 
+// 0. Nginx-RTMP Authentication Callback (POST x-www-form-urlencoded from nginx-rtmp)
+hooksRouter.post("/rtmp-auth", (req: Request, res: Response) => {
+  const callerIp = req.ip || req.socket.remoteAddress || "";
+  const isAllowedInternal = isInternalRequest(req);
+
+  const rawName = (req.body.name || "").toString().trim();
+  const streamKey = sanitizeStreamKey(rawName);
+  const clientIp = (req.body.addr || "").toString().trim() || "unknown";
+  const app = (req.body.app || "live").toString().trim();
+
+  if (!isAllowedInternal) {
+    console.warn(`[NGINX-RTMP AUTH] REJECTED non-internal request from ${callerIp}`);
+    logFieldAuth({
+      action: "publish",
+      rawPath: `${app}/${rawName}`,
+      sanitizedKey: streamKey,
+      clientIp,
+      callerIp,
+      isInternalAllowed: false,
+      dbMatched: false,
+      decision: "REJECTED",
+      statusCode: 403,
+      reason: `Caller IP ${callerIp} is not in Docker internal network subnet`,
+      rawBody: req.body,
+    });
+    return res.status(403).send("Forbidden");
+  }
+
+  console.log(`[NGINX-RTMP AUTH] App: "${app}", Key: "${streamKey}" (raw: "${rawName}"), ClientIP: ${clientIp}, CallerIP: ${callerIp}`);
+
+  let stream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(streamKey) as any;
+
+  if (!stream) {
+    console.warn(`[NGINX-RTMP AUTH] REJECTED publish: key "${streamKey}" not found in DB`);
+    logFieldAuth({
+      action: "publish",
+      rawPath: `${app}/${rawName}`,
+      sanitizedKey: streamKey,
+      clientIp,
+      callerIp,
+      isInternalAllowed: true,
+      dbMatched: false,
+      decision: "REJECTED",
+      statusCode: 401,
+      reason: `Stream key "${streamKey}" does not exist in database`,
+      rawBody: req.body,
+    });
+    return res.status(401).send("Invalid stream key");
+  }
+
+  if (!stream.is_active) {
+    console.warn(`[NGINX-RTMP AUTH] REJECTED publish: stream "${stream.name}" (${streamKey}) is DEACTIVATED`);
+    logFieldAuth({
+      action: "publish",
+      rawPath: `${app}/${rawName}`,
+      sanitizedKey: streamKey,
+      clientIp,
+      callerIp,
+      isInternalAllowed: true,
+      dbMatched: true,
+      streamName: stream.name,
+      isActive: false,
+      decision: "REJECTED",
+      statusCode: 401,
+      reason: `Stream "${stream.name}" (${streamKey}) is inactive in dashboard`,
+      rawBody: req.body,
+    });
+    return res.status(401).send("Stream key is inactive");
+  }
+
+  console.log(`[NGINX-RTMP AUTH] ACCEPTED publish for stream: "${stream.name}" (${streamKey}) from client IP ${clientIp}`);
+  logFieldAuth({
+    action: "publish",
+    rawPath: `${app}/${rawName}`,
+    sanitizedKey: streamKey,
+    clientIp,
+    callerIp,
+    isInternalAllowed: true,
+    dbMatched: true,
+    streamName: stream.name,
+    isActive: true,
+    decision: "ACCEPTED",
+    statusCode: 200,
+    reason: `Authorized stream "${stream.name}" via nginx-rtmp relay`,
+    rawBody: req.body,
+  });
+
+  db.prepare("INSERT INTO stream_logs (stream_id, stream_key, event, client_ip) VALUES (?, ?, 'publish_start', ?)").run(
+    stream.id,
+    streamKey,
+    clientIp
+  );
+
+  return res.status(200).send("OK");
+});
+
+// Nginx-RTMP on_publish_done Callback (Stream Ended)
+hooksRouter.post("/on-unpublish-nginx", (req: Request, res: Response) => {
+  const callerIp = req.ip || req.socket.remoteAddress || "";
+  if (!isInternalRequest(req)) {
+    return res.status(403).send("Forbidden");
+  }
+
+  const rawName = (req.body.name || "").toString().trim();
+  const streamKey = sanitizeStreamKey(rawName);
+  const clientIp = (req.body.addr || "").toString().trim() || "unknown";
+
+  console.log(`[NGINX-RTMP UNPUBLISH] Key: ${streamKey}, ClientIP: ${clientIp}`);
+
+  const stream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(streamKey) as any;
+  if (stream) {
+    db.prepare("INSERT INTO stream_logs (stream_id, stream_key, event, client_ip) VALUES (?, ?, 'publish_stop', ?)").run(
+      stream.id,
+      streamKey,
+      clientIp
+    );
+
+    if (stream.auto_record) {
+      setTimeout(async () => {
+        const latestFile = findLatestRecordingFile(streamKey);
+        if (latestFile && latestFile.size > 1024) {
+          const existing = db.prepare("SELECT id FROM recordings WHERE filepath = ?").get(latestFile.filepath);
+          if (!existing) {
+            await ensureFaststart(latestFile.filepath);
+            const finalSize = fs.existsSync(latestFile.filepath) ? fs.statSync(latestFile.filepath).size : latestFile.size;
+            const expiresAt = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
+            db.prepare(`
+              INSERT INTO recordings (stream_id, stream_key, filename, filepath, file_size, expires_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `).run(stream.id, streamKey, latestFile.filename, latestFile.filepath, finalSize, expiresAt);
+            console.log(`[RECORDING] Registered recording for stream ${streamKey}: ${latestFile.filename} (${(finalSize / (1024 * 1024)).toFixed(2)} MB)`);
+          }
+        }
+      }, 3000);
+    }
+  }
+
+  return res.status(200).send("OK");
+});
+
 // 1. MediaMTX Authentication Webhook (Called on every publish / read)
 hooksRouter.post("/auth", (req: Request, res: Response) => {
   const callerIp = req.ip || req.socket.remoteAddress || "";

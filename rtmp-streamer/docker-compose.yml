@@ -3,14 +3,34 @@
 # ================================================================
 
 services:
-  # 1. MediaMTX: Media server (RTMP, WebRTC, HLS, RTSP)
+  # 0. Nginx-RTMP: DJI-compatible RTMP ingest relay
+  #    Accepts RTMP from DJI drones, OBS, etc. and relays to MediaMTX via RTSP
+  #    Solves: "received a packet for video track 0, but track is not set up"
+  nginx-rtmp:
+    build:
+      context: ./nginx-rtmp
+      dockerfile: Dockerfile
+    container_name: rtmp-nginx-rtmp
+    restart: unless-stopped
+    ports:
+      - "1935:1935"   # RTMP ingest (drones / OBS push) — moved from MediaMTX
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    depends_on:
+      - mediamtx
+      - server
+
+  # 1. MediaMTX: Media server (RTSP, WebRTC, HLS) — NO longer handles RTMP ingest directly
   mediamtx:
     image: bluenviron/mediamtx:latest-ffmpeg
     container_name: rtmp-mediamtx
     restart: unless-stopped
     ports:
-      - "1935:1935"   # RTMP ingest (drones / OBS push)
-      - "8554:8554"   # RTSP ingest / playback
+      # RTMP port 1935 moved to nginx-rtmp service above
+      - "8554:8554"   # RTSP ingest (receives relayed streams from nginx-rtmp)
       - "8888:8888"   # HLS (LL-HLS) playback
       - "8889:8889"   # WebRTC (WHEP) signaling (TCP)
       - "8889:8889/udp" # WebRTC media transport (UDP)
