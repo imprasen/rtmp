@@ -91,6 +91,21 @@ hooksRouter.post("/field-logs/clear", requireAuth, (req: Request, res: Response)
   return res.json({ ok: true, message: "Field diagnostic logs cleared" });
 });
 
+// In-memory live publisher tracking for immediate zero-latency dashboard status
+const activePublishers = new Set<string>();
+
+export function markStreamLive(key: string) {
+  if (key) activePublishers.add(key);
+}
+
+export function markStreamOffline(key: string) {
+  if (key) activePublishers.delete(key);
+}
+
+export function isStreamLiveInMemory(key: string): boolean {
+  return activePublishers.has(key);
+}
+
 // 0. Nginx-RTMP Authentication Callback (POST x-www-form-urlencoded from nginx-rtmp)
 hooksRouter.post("/rtmp-auth", (req: Request, res: Response) => {
   const callerIp = req.ip || req.socket.remoteAddress || "";
@@ -178,6 +193,8 @@ hooksRouter.post("/rtmp-auth", (req: Request, res: Response) => {
     rawBody: req.body,
   });
 
+  markStreamLive(streamKey);
+
   db.prepare("INSERT INTO stream_logs (stream_id, stream_key, event, client_ip) VALUES (?, ?, 'publish_start', ?)").run(
     stream.id,
     streamKey,
@@ -198,6 +215,7 @@ hooksRouter.post("/on-unpublish-nginx", (req: Request, res: Response) => {
   const streamKey = sanitizeStreamKey(rawName);
   const clientIp = (req.body.addr || "").toString().trim() || "unknown";
 
+  markStreamOffline(streamKey);
   console.log(`[NGINX-RTMP UNPUBLISH] Key: ${streamKey}, ClientIP: ${clientIp}`);
 
   const stream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(streamKey) as any;
@@ -372,6 +390,7 @@ hooksRouter.post("/on-publish", (req: Request, res: Response) => {
 
   const { path: streamPath } = req.body;
   const streamKey = sanitizeStreamKey(streamPath);
+  markStreamLive(streamKey);
   console.log(`[EVENT] Stream started publishing: ${streamKey}`);
 
   const stream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(streamKey) as any;
@@ -394,6 +413,7 @@ hooksRouter.post("/on-unpublish", (req: Request, res: Response) => {
 
   const { path: streamPath } = req.body;
   const streamKey = sanitizeStreamKey(streamPath);
+  markStreamOffline(streamKey);
   console.log(`[EVENT] Stream stopped publishing: ${streamKey}`);
 
   const stream = db.prepare("SELECT * FROM streams WHERE stream_key = ?").get(streamKey) as any;

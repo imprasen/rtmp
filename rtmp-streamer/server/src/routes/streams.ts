@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { randomInt } from "crypto";
 import { db } from "../db.js";
 import { requireAuth, requireAdmin } from "../middleware/optionalAuth.js";
+import { isStreamLiveInMemory } from "./hooks.js";
 
 export const streamsRouter = Router();
 
@@ -39,6 +40,11 @@ function generate5DigitKey(): string {
   return key;
 }
 
+function cleanPathKey(rawName: string): string {
+  const trimmed = (rawName || "").trim().replace(/^\/+|\/+$/g, "");
+  return trimmed.replace(/^(live|ingest)\//, "").replace(/^(live|ingest)/, "");
+}
+
 async function getLiveStreamsFromMediaMTX(): Promise<Map<string, { ready: boolean; readersCount: number; bytesReceived: number }>> {
   const liveMap = new Map<string, { ready: boolean; readersCount: number; bytesReceived: number }>();
   try {
@@ -47,9 +53,9 @@ async function getLiveStreamsFromMediaMTX(): Promise<Map<string, { ready: boolea
       const data = (await res.json()) as { items?: MediaMTXPathItem[] };
       if (data.items) {
         for (const item of data.items) {
-          const key = item.name.replace(/^(live|ingest)\//, "");
+          const key = cleanPathKey(item.name);
           liveMap.set(key, {
-            ready: !!item.ready,
+            ready: item.ready !== undefined ? !!item.ready : true,
             readersCount: item.readers ? item.readers.length : 0,
             bytesReceived: item.bytesReceived || 0,
           });
@@ -97,7 +103,7 @@ streamsRouter.get("/", async (req: Request, res: Response) => {
       is_public: Boolean(s.is_public),
       auto_record: Boolean(s.auto_record),
       created_at: s.created_at,
-      is_live: liveInfo ? liveInfo.ready : false,
+      is_live: Boolean((liveInfo && liveInfo.ready) || isStreamLiveInMemory(s.stream_key)),
       viewers_count: liveInfo ? liveInfo.readersCount : 0,
       recordings_count: recordingCount,
       rtmp_url: `rtmp://${publicHost}:1935/live/${s.stream_key}`,
@@ -150,7 +156,7 @@ streamsRouter.get("/:idOrKey", async (req: Request, res: Response) => {
     is_public: Boolean(stream.is_public),
     auto_record: Boolean(stream.auto_record),
     created_at: stream.created_at,
-    is_live: liveInfo ? liveInfo.ready : false,
+    is_live: Boolean((liveInfo && liveInfo.ready) || isStreamLiveInMemory(stream.stream_key)),
     viewers_count: liveInfo ? liveInfo.readersCount : 0,
     rtmp_url: `rtmp://${publicHost}:1935/live/${stream.stream_key}`,
     rtsp_url: `rtsp://${publicHost}:8554/live/${stream.stream_key}`,
