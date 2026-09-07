@@ -12,9 +12,17 @@ const recordingsBaseDir = process.env.RECORDING_PATH || "/recordings";
 const retentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS || "7", 10);
 
 // P0-5: Sanitize stream key — remove any path traversal characters and normalize
+// Handles DJI path variants: "live/77017", "live77017", "1935/live/77017", "77017"
 function sanitizeStreamKey(rawPath: string): string {
-  const trimmed = (rawPath || "").trim().replace(/^\/+|\/+$/g, "");
-  const key = trimmed.replace(/^(live|ingest)\//, "");
+  let trimmed = (rawPath || "").trim().replace(/^\/+|\/+$/g, "");
+  // Strip leading port-prefix (e.g. "1935/live/77017" → "live/77017")
+  trimmed = trimmed.replace(/^\d{2,5}\//, "");
+  // Strip "live/" or "ingest/" prefix (with slash)
+  let key = trimmed.replace(/^(live|ingest)\//, "");
+  // Strip "live" or "ingest" prefix WITHOUT slash (DJI sends "live77017")
+  if (key === trimmed) {
+    key = trimmed.replace(/^(live|ingest)/, "");
+  }
   // Strip anything that isn't alphanumeric, dash, or underscore
   return key.replace(/[^a-zA-Z0-9_-]/g, "");
 }
