@@ -47,7 +47,8 @@ export async function syncRecordingsFromDiskAsync() {
     const files = await getAllFilesAsync(recordingsBaseDir);
     for (const fullPath of files) {
       const stats = await fs.promises.stat(fullPath);
-      if (stats.size < 1024) continue;
+      // Ignore micro-fragments and empty aborted files under 500KB
+      if (stats.size < 500 * 1024) continue;
 
       const filename = path.basename(fullPath);
 

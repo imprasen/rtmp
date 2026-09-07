@@ -47,34 +47,41 @@ function isInternalRequest(req: Request): boolean {
 
 // Helper to scan directory for newly created recording files
 function findLatestRecordingFile(streamKey: string): { filename: string; filepath: string; size: number } | null {
-  // P0-5: Verify resolved path stays within recordings directory
-  const targetDir = path.join(recordingsBaseDir, "live", streamKey);
-  const resolvedDir = path.resolve(targetDir);
-  const resolvedBase = path.resolve(recordingsBaseDir);
-  if (!resolvedDir.startsWith(resolvedBase)) {
-    console.error(`[HOOKS] Path traversal blocked for key: ${streamKey}`);
-    return null;
-  }
+  const searchDirs = [
+    path.join(recordingsBaseDir, "live", streamKey),
+    path.join(recordingsBaseDir, "live"),
+    recordingsBaseDir,
+  ];
 
-  if (!fs.existsSync(targetDir)) {
-    return null;
-  }
+  const matchedFiles: Array<{ filename: string; filepath: string; size: number; mtime: number }> = [];
 
-  try {
-    const files = fs.readdirSync(targetDir)
-      .filter((f) => f.endsWith(".mp4") || f.endsWith(".fmp4"))
-      .map((f) => {
-        const fullPath = path.join(targetDir, f);
+  for (const dir of searchDirs) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const entries = fs.readdirSync(dir);
+      for (const entry of entries) {
+        if (!entry.endsWith(".mp4") && !entry.endsWith(".fmp4")) continue;
+        if (!entry.includes(streamKey)) continue;
+
+        const fullPath = path.join(dir, entry);
         const stats = fs.statSync(fullPath);
-        return { filename: f, filepath: fullPath, size: stats.size, mtime: stats.mtimeMs };
-      })
-      .sort((a, b) => b.mtime - a.mtime);
-
-    return files.length > 0 ? files[0] : null;
-  } catch (err) {
-    console.error("Error scanning recordings directory:", err);
-    return null;
+        // Ignore empty fragments or aborted micro-sessions under 500KB
+        if (stats.isFile() && stats.size >= 500 * 1024) {
+          matchedFiles.push({
+            filename: entry,
+            filepath: fullPath,
+            size: stats.size,
+            mtime: stats.mtimeMs,
+          });
+        }
+      }
+    } catch {
+      // Ignore directory scan errors
+    }
   }
+
+  matchedFiles.sort((a, b) => b.mtime - a.mtime);
+  return matchedFiles.length > 0 ? matchedFiles[0] : null;
 }
 
 // Diagnostic API endpoints for field debugging
