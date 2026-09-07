@@ -7,13 +7,13 @@ services:
   #    Accepts RTMP from DJI drones, OBS, etc. and relays to MediaMTX via RTSP
   #    Solves: "received a packet for video track 0, but track is not set up"
   nginx-rtmp:
-    build:
-      context: ./nginx-rtmp
-      dockerfile: Dockerfile
+    image: alfg/nginx-rtmp:latest
     container_name: rtmp-nginx-rtmp
     restart: unless-stopped
     ports:
       - "1935:1935"   # RTMP ingest (drones / OBS push) — moved from MediaMTX
+    volumes:
+      - ./nginx-rtmp/nginx.conf:/etc/nginx/nginx.conf:ro
     logging:
       driver: "json-file"
       options:

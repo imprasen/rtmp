@@ -12,7 +12,7 @@
 
 | Container Name | Image Name | Container ID | Host Port Mappings | Status | Purpose |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`rtmp-nginx-rtmp`** | `rtmp-streamer-nginx-rtmp` | *Dynamic* | `0.0.0.0:1935 -> 1935/tcp` | Running | Dedicated RTMP Ingest & Stream Relay (Solves DJI packet track initialization) |
+| **`rtmp-nginx-rtmp`** | `alfg/nginx-rtmp:latest` | *Dynamic* | `0.0.0.0:1935 -> 1935/tcp` | Running | Dedicated RTMP Ingest & Stream Relay (Solves DJI packet track initialization) |
 | **`rtmp-client`** | `rtmp-streamer-client` | `72396b1d547a` | `0.0.0.0:3000 -> 80/tcp` | Running | React 18 Frontend & Nginx API/Media Reverse Proxy |
 | **`rtmp-server`** | `rtmp-streamer-server` | `33ecff9b6f34` | `127.0.0.1:5011 -> 5011/tcp` | Running (healthy) | Node.js 22 REST API, SQLite DB, Auth & Session Engine |
 | **`rtmp-mediamtx`** | `bluenviron/mediamtx:latest-ffmpeg` | `aa55fbc32c2e` | `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | Core Media Server: RTSP Ingest, WebRTC (WHEP), LL-HLS, MP4 Auto-Recording |
