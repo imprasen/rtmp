@@ -10,6 +10,7 @@ services:
     image: alfg/nginx-rtmp:latest
     container_name: rtmp-nginx-rtmp
     restart: unless-stopped
+    entrypoint: ["nginx"]
     ports:
       - "1935:1935"   # RTMP ingest (drones / OBS push) — moved from MediaMTX
     volumes:
