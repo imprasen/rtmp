@@ -4,7 +4,7 @@
 **Tailscale IP:** `100.118.109.5`  
 **Host Project Working Directory:** `/opt/rtmp/rtmp-streamer`  
 **Compose File:** `/opt/rtmp/rtmp-streamer/docker-compose.yml`  
-**Last Updated:** 05-09-2026  
+**Last Updated:** 07-09-2026  
 
 ---
 
@@ -12,15 +12,29 @@
 
 | Container Name | Image Name | Container ID | Host Port Mappings | Status | Purpose |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`rtmp-nginx-rtmp`** | `rtmp-streamer-nginx-rtmp` | *Dynamic* | `0.0.0.0:1935 -> 1935/tcp` | Running | Dedicated RTMP Ingest & Stream Relay (Solves DJI packet track initialization) |
 | **`rtmp-client`** | `rtmp-streamer-client` | `72396b1d547a` | `0.0.0.0:3000 -> 80/tcp` | Running | React 18 Frontend & Nginx API/Media Reverse Proxy |
 | **`rtmp-server`** | `rtmp-streamer-server` | `33ecff9b6f34` | `127.0.0.1:5011 -> 5011/tcp` | Running (healthy) | Node.js 22 REST API, SQLite DB, Auth & Session Engine |
-| **`rtmp-mediamtx`** | `bluenviron/mediamtx:latest-ffmpeg` | `aa55fbc32c2e` | `1935/tcp`, `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | Official MediaMTX Engine with Pre-installed FFmpeg Auto-Transcoder |
+| **`rtmp-mediamtx`** | `bluenviron/mediamtx:latest-ffmpeg` | `aa55fbc32c2e` | `8554/tcp`, `8888/tcp`, `8889/tcp+udp`, `127.0.0.1:9997` | Running | Core Media Server: RTSP Ingest, WebRTC (WHEP), LL-HLS, MP4 Auto-Recording |
 
 ---
 
 ## 2. Container Deep-Dive & Port Specifications
 
-### A. `rtmp-client` (Frontend Dashboard)
+### A. `rtmp-nginx-rtmp` (RTMP Ingest & Protocol Relay)
+- **Container Name:** `rtmp-nginx-rtmp`
+- **Internal Port:** `1935/tcp`
+- **Host Exposed Port:** `0.0.0.0:1935` *(Bound to port 1935 on Server 0149, mapped via WAN DNAT)*
+- **Configuration File:** `/opt/rtmp/rtmp-streamer/nginx-rtmp/nginx.conf`
+- **Purpose & Architecture:**
+  - Ingests raw RTMP connections from DJI RS 2, DJI GO 4, OBS Studio, and mobile transmitters.
+  - Validates stream key with backend auth hook (`http://server:5011/api/hooks/rtmp-auth`).
+  - Automatically re-packets video streams with complete SPS/PPS metadata and relays to MediaMTX via RTSP TCP (`rtsp://mediamtx:8554/live/$name`).
+  - Completely eliminates the DJI drone error: `received a packet for video track 0, but track is not set up`.
+
+---
+
+### B. `rtmp-client` (Frontend Dashboard)
 - **Container Name:** `rtmp-client`
 - **Internal Port:** `80/tcp` (Nginx)
 - **Host Exposed Port:** `0.0.0.0:3000` (All interfaces on Server 0149)
@@ -35,13 +49,14 @@
 
 ---
 
-### B. `rtmp-server` (Backend API & Authentication)
+### C. `rtmp-server` (Backend API & Authentication)
 - **Container Name:** `rtmp-server`
 - **Internal Port:** `5011/tcp`
-- **Host Exposed Port:** `127.0.0.1:5011` *(Bound to localhost for security — only reachable via `rtmp-client` reverse proxy)*
+- **Host Exposed Port:** `127.0.0.1:5011` *(Bound to localhost for security — only reachable via `rtmp-client` reverse proxy and internal docker containers)*
 - **Volumes:**
   - `server-data:/app/data` (SQLite database: `streamer.db`)
   - `/opt/rtmp/rtmp-streamer/recordings:/recordings` (Video archive)
+  - `/opt/rtmp/rtmp-streamer/logs:/app/logs` (Persistent field diagnostics)
 - **Key Environment Variables:**
   - `PORT=5011`
   - `NODE_ENV=production`
@@ -52,24 +67,18 @@
 
 ---
 
-### C. `rtmp-mediamtx` (Media Engine + FFmpeg Transcoder)
+### D. `rtmp-mediamtx` (Media Engine & Recording)
 - **Container Name:** `rtmp-mediamtx`
-- **Base Image:** `bluenviron/mediamtx:latest-ffmpeg` (Official MediaMTX image with built-in FFmpeg)
+- **Base Image:** `bluenviron/mediamtx:latest-ffmpeg`
 - **Exposed Ports:**
-  - `1935:1935/tcp` ──► **RTMP Direct (`live/*`) & Ingest (`ingest/*`)**
-    - Direct Publish: `rtmp://rtmp.dhanushuav.in:1935/live/{STREAM-KEY}` (OBS Studio, lowest latency)
-    - Auto-Transcode: `rtmp://rtmp.dhanushuav.in:1935/ingest/{STREAM-KEY}` (DJI GO 4 drones)
-  - `8554:8554/tcp` ──► RTSP Ingest & Internal Transcoding Loopback
+  - `8554:8554/tcp` ──► RTSP Ingest (Receives cleanly repackaged streams from `rtmp-nginx-rtmp`)
   - `8888:8888/tcp` ──► HLS (LL-HLS) video stream (`live/*`)
   - `8889:8889/tcp` ──► WebRTC WHEP HTTP Signaling
   - `8889:8889/udp` ──► WebRTC Media UDP Transport
   - `127.0.0.1:9997:9997/tcp` ──► MediaMTX Control API (Internal only)
 - **Configuration File:** `/opt/rtmp/rtmp-streamer/mediamtx/mediamtx.yml`
-- **Real-Time Auto-Transcoding Pipeline:**
-  - Ingest URL: `rtmp://rtmp.dhanushuav.in:1935/ingest/{STREAM-KEY}`
-  - FFmpeg Hook (`sh -c`): Scales & pads any non-standard video (e.g. DJI `1080x720`) to standard `1280x720` with 16-pixel macroblock alignment, GOP 30, and republishes to `live/{STREAM-KEY}`.
+- **Recording Engine:** Auto-records live streams as single continuous MP4 files to `/recordings/`.
 - **NAT Traversal:** `webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]`
-- **Storage Volume:** `/opt/rtmp/rtmp-streamer/recordings:/recordings`
 
 ---
 
@@ -85,11 +94,11 @@ cd /opt/rtmp/rtmp-streamer
 docker compose ps
 
 # View container logs
-docker compose logs -f [server|client|mediamtx]
+docker compose logs -f [nginx-rtmp|server|client|mediamtx]
 
 # Pull latest code & update containers
 git pull origin main
-docker compose build client server
+docker compose build nginx-rtmp server client
 docker compose up -d
 
 # Restart all containers
