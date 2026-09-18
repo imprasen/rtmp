@@ -9,7 +9,7 @@ export const LivePlayer: React.FC = () => {
   const { key } = useParams<{ key: string }>();
   const [stream, setStream] = useState<StreamItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [playerMode, setPlayerMode] = useState<"webrtc" | "hls">("hls");
+  const [playerMode, setPlayerMode] = useState<"webrtc" | "hls">("webrtc");
   const [copiedRtmp, setCopiedRtmp] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
 
@@ -84,7 +84,7 @@ export const LivePlayer: React.FC = () => {
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              <Radio className="w-3.5 h-3.5" /> LL-HLS (2-4s)
+              <Radio className="w-3.5 h-3.5" /> LL-HLS (1-2s)
             </button>
           </div>
         </div>

@@ -14,6 +14,7 @@ export const StreamCard: React.FC<StreamCardProps> = ({ stream, isAdmin, onDelet
   const [copiedKey, setCopiedKey] = useState(false);
 
   const [copiedServer, setCopiedServer] = useState(false);
+  const [copiedDji, setCopiedDji] = useState(false);
 
   const copyServer = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -113,6 +114,27 @@ export const StreamCard: React.FC<StreamCardProps> = ({ stream, isAdmin, onDelet
             </div>
             <p className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-800 select-all">
               {stream.stream_key}
+            </p>
+          </div>
+
+          {/* DJI Drone URL Field (Combined Single String) */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+              <span className="font-semibold text-emerald-700 dark:text-emerald-400">DJI Drone URL (Combined):</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(fullRtmpUrl);
+                  setCopiedDji(true);
+                  setTimeout(() => setCopiedDji(false), 2000);
+                }}
+                className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono transition-colors text-[11px] font-semibold"
+              >
+                {copiedDji ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedDji ? "Copied DJI URL!" : "Copy DJI URL"}
+              </button>
+            </div>
+            <p className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded border border-emerald-300 dark:border-emerald-800/60 select-all">
+              {fullRtmpUrl}
             </p>
           </div>
         </div>

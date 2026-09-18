@@ -28,8 +28,12 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
     if (Hls.isSupported()) {
       const hls = new Hls({
         lowLatencyMode: true,
-        backBufferLength: 30,
+        backBufferLength: 5,
         enableWorker: true,
+        liveSyncDurationCount: 1,
+        liveMaxLatencyDurationCount: 3,
+        liveDurationInfinity: true,
+        highBufferWatchdogPeriod: 1,
       });
       hlsRef.current = hls;
 
@@ -92,7 +96,7 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
 
       <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
         <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/90 text-white shadow-lg backdrop-blur">
-          <Radio className="w-3.5 h-3.5" /> LL-HLS Playback (2–4s latency)
+          <Radio className="w-3.5 h-3.5" /> LL-HLS Playback (1–2s latency)
         </span>
       </div>
 
