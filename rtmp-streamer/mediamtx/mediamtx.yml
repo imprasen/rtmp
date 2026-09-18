@@ -22,11 +22,13 @@ rtspAddress: :8554
 rtspTransports: [tcp, udp]
 
 # WebRTC (WHEP / WHIP) - Sub-500ms Ultra Low Latency playback
+# Aligned with Firewall Rule 12 (Port 8899 UDP & TCP)
 webrtc: yes
-webrtcAddress: :8889
-webrtcLocalUDPAddress: :8889
+webrtcAddress: :8899
+webrtcLocalUDPAddress: :8899
+webrtcLocalTCPAddress: :8899
 webrtcAllowOrigins: ["*"]
-webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]
+webrtcAdditionalHosts: ["rtmp.dhanushuav.in", "14.97.37.70"]
 
 # HLS - Universal Low Latency fallback playback
 hls: yes
