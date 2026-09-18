@@ -9,7 +9,7 @@ export const LivePlayer: React.FC = () => {
   const { key } = useParams<{ key: string }>();
   const [stream, setStream] = useState<StreamItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [playerMode, setPlayerMode] = useState<"webrtc" | "hls">("webrtc");
+  const [playerMode, setPlayerMode] = useState<"webrtc" | "hls">("hls");
   const [copiedRtmp, setCopiedRtmp] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
 
