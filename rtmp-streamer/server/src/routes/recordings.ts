@@ -64,11 +64,12 @@ export async function syncRecordingsFromDiskAsync() {
         const stream = db.prepare("SELECT id, name FROM streams WHERE stream_key = ?").get(streamKey) as { id: number; name: string } | undefined;
         const streamId = stream ? stream.id : null;
 
+        const nowIso = new Date().toISOString();
         const expiresAt = new Date(Date.now() + defaultRetentionDays * 24 * 60 * 60 * 1000).toISOString();
         db.prepare(`
           INSERT INTO recordings (stream_id, stream_key, filename, filepath, file_size, expires_at, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-        `).run(streamId, streamKey, filename, fullPath, stats.size, expiresAt);
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(streamId, streamKey, filename, fullPath, stats.size, expiresAt, nowIso);
       }
     }
   } catch (err) {

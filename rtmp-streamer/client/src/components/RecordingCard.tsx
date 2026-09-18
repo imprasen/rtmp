@@ -65,9 +65,14 @@ export const RecordingCard: React.FC<RecordingCardProps> = ({
               <Clock className="w-3.5 h-3.5" /> Flight Recorded:
             </span>
             <span className="text-slate-700 dark:text-slate-200">
-              {new Date(recording.created_at).toLocaleString(undefined, {
+              {new Date(
+                recording.created_at.includes("Z") || recording.created_at.includes("+")
+                  ? recording.created_at
+                  : recording.created_at.replace(" ", "T") + "Z"
+              ).toLocaleString("en-IN", {
                 dateStyle: "medium",
-                timeStyle: "short",
+                timeStyle: "medium",
+                timeZone: "Asia/Kolkata",
               })}
             </span>
           </div>

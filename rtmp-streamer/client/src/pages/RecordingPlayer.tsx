@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, ShieldCheck, Clock, Trash2, HardDrive, AlertCircle, Gauge, RotateCcw, RotateCw } from "lucide-react";
+import { ArrowLeft, Download, ShieldCheck, Clock, Trash2, HardDrive, AlertCircle, Gauge, RotateCcw, RotateCw, Repeat } from "lucide-react";
 import { api, RecordingItem, UserState } from "../services/api";
 
 interface RecordingPlayerProps {
@@ -19,6 +19,17 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
   const [error, setError] = useState<string | null>(null);
   const [customDays, setCustomDays] = useState<number>(7);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
+
+  const handleToggleLoop = () => {
+    setIsLooping((prev) => {
+      const next = !prev;
+      if (videoRef.current) {
+        videoRef.current.loop = next;
+      }
+      return next;
+    });
+  };
 
   const fetchRecording = async () => {
     try {
@@ -163,6 +174,7 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
           ref={videoRef}
           controls
           autoPlay
+          loop={isLooping}
           preload="auto"
           playsInline
           className="w-full h-full object-contain bg-black"
@@ -200,7 +212,7 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
           </div>
         </div>
 
-        {/* Quick Skip Buttons (-10s / +10s) */}
+        {/* Quick Skip Buttons (-10s / +10s) & Loop Toggle */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleSeek(-10)}
@@ -215,6 +227,17 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
             title="Skip forward 10 seconds"
           >
             +10s <RotateCw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          </button>
+          <button
+            onClick={handleToggleLoop}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${
+              isLooping
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/30"
+                : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+            }`}
+            title={isLooping ? "Looping enabled (Click to disable)" : "Looping disabled (Click to enable)"}
+          >
+            <Repeat className="w-3.5 h-3.5" /> {isLooping ? "Loop: ON" : "Loop"}
           </button>
         </div>
       </div>
