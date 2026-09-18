@@ -35,10 +35,8 @@ services:
       # RTMP port 1935 moved to nginx-rtmp service above
       - "8554:8554"   # RTSP ingest (receives relayed streams from nginx-rtmp)
       - "8888:8888"   # HLS (LL-HLS) playback
-      - "8899:8899"   # WebRTC (WHEP) signaling (TCP) — aligned with Firewall Rule 12
+      - "8889:8889"   # WebRTC (WHEP) signaling (TCP)
       - "8899:8899/udp" # WebRTC media transport (UDP) — aligned with Firewall Rule 12
-      - "8889:8889"   # Backward compatibility
-      - "8889:8889/udp" # Backward compatibility
       - "127.0.0.1:9997:9997"   # MediaMTX REST API (internal only — P0-6)
     volumes:
       - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
