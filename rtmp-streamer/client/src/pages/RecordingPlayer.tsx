@@ -261,8 +261,17 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
 
               <span className="flex items-center gap-1.5 font-medium">
                 <Clock className="w-4 h-4 text-slate-400" /> Recorded:{" "}
-                <span className="text-slate-800 dark:text-slate-200">
-                  {new Date(recording.created_at).toLocaleString()}
+                <span className="text-slate-800 dark:text-slate-200 font-medium">
+                  {new Date(
+                    recording.created_at.includes("Z") || recording.created_at.includes("+")
+                      ? recording.created_at
+                      : recording.created_at.replace(" ", "T") + "Z"
+                  ).toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "medium",
+                    timeZone: "Asia/Kolkata",
+                  })}{" "}
+                  <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">IST</span>
                 </span>
               </span>
             </div>

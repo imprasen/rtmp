@@ -73,7 +73,8 @@ export const RecordingCard: React.FC<RecordingCardProps> = ({
                 dateStyle: "medium",
                 timeStyle: "medium",
                 timeZone: "Asia/Kolkata",
-              })}
+              })}{" "}
+              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1 py-0.5 rounded border border-emerald-500/20">IST</span>
             </span>
           </div>
         </div>
