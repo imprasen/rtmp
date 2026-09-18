@@ -31,9 +31,8 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
         lowLatencyMode: true,
         backBufferLength: 5,
         enableWorker: true,
-        liveSyncDurationCount: 0,
-        liveMaxLatencyDurationCount: 2,
-        maxLiveSyncPlaybackRate: 1.05,
+        liveSyncDurationCount: 1,
+        liveMaxLatencyDurationCount: 3,
         liveDurationInfinity: true,
         highBufferWatchdogPeriod: 1,
       });
