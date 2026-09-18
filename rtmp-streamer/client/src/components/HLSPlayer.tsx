@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { AlertCircle, RefreshCw, Volume2, VolumeX, Maximize2, Radio } from "lucide-react";
+import { AlertCircle, RefreshCw, Volume2, VolumeX, Maximize2, Radio, Repeat } from "lucide-react";
 
 interface HLSPlayerProps {
   streamKey: string;
@@ -11,6 +11,7 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
   const hlsRef = useRef<Hls | null>(null);
   const [status, setStatus] = useState<"loading" | "playing" | "error">("loading");
   const [isMuted, setIsMuted] = useState(true);
+  const [isLooping, setIsLooping] = useState(true);
 
   const initHls = () => {
     const video = videoRef.current;
@@ -91,6 +92,7 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
         autoPlay
         playsInline
         muted={isMuted}
+        loop={isLooping}
         className="w-full h-full object-contain bg-black"
       />
 
@@ -144,6 +146,22 @@ export const HLSPlayer: React.FC<HLSPlayerProps> = ({ streamKey }) => {
             aria-label="Reload HLS"
           >
             <RefreshCw className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => {
+              const next = !isLooping;
+              setIsLooping(next);
+              if (videoRef.current) {
+                videoRef.current.loop = next;
+              }
+            }}
+            className={`p-2 rounded-lg backdrop-blur transition-colors ${
+              isLooping ? "bg-emerald-600 text-white" : "bg-slate-800/80 hover:bg-slate-700 text-slate-300"
+            }`}
+            title={isLooping ? "Auto-Loop: ON (Click to disable)" : "Auto-Loop: OFF (Click to enable)"}
+            aria-label="Toggle Auto-Loop"
+          >
+            <Repeat className="w-5 h-5" />
           </button>
         </div>
         <button

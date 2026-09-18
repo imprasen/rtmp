@@ -31,6 +31,28 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
     });
   };
 
+  const formatFlightTimeIST = () => {
+    if (!recording) return "";
+    const match = recording.filename.match(/_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [_, y, m, d, h, min, s] = match;
+      const utcMs = Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), parseInt(h, 10), parseInt(min, 10), parseInt(s, 10));
+      return new Date(utcMs).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "medium",
+        timeStyle: "medium",
+      });
+    }
+
+    const raw = recording.created_at || "";
+    const iso = raw.includes("Z") || raw.includes("+") ? raw : raw.replace(" ", "T") + "Z";
+    return new Date(iso).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "medium",
+    });
+  };
+
   const fetchRecording = async () => {
     try {
       const res = await api.get(`/recordings/${id}`);
@@ -262,15 +284,7 @@ export const RecordingPlayer: React.FC<RecordingPlayerProps> = ({ userState }) =
               <span className="flex items-center gap-1.5 font-medium">
                 <Clock className="w-4 h-4 text-slate-400" /> Recorded:{" "}
                 <span className="text-slate-800 dark:text-slate-200 font-medium">
-                  {new Date(
-                    recording.created_at.includes("Z") || recording.created_at.includes("+")
-                      ? recording.created_at
-                      : recording.created_at.replace(" ", "T") + "Z"
-                  ).toLocaleString("en-IN", {
-                    dateStyle: "medium",
-                    timeStyle: "medium",
-                    timeZone: "Asia/Kolkata",
-                  })}{" "}
+                  {formatFlightTimeIST()}{" "}
                   <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">IST</span>
                 </span>
               </span>

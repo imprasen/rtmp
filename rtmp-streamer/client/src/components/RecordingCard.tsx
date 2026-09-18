@@ -16,6 +16,28 @@ export const RecordingCard: React.FC<RecordingCardProps> = ({
   onToggleKeep,
   onDelete,
 }) => {
+  // Convert flight recording timestamp to precise Indian Standard Time (IST)
+  const formatFlightTimeIST = () => {
+    const match = recording.filename.match(/_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [_, y, m, d, h, min, s] = match;
+      const utcMs = Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), parseInt(h, 10), parseInt(min, 10), parseInt(s, 10));
+      return new Date(utcMs).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "medium",
+        timeStyle: "medium",
+      });
+    }
+
+    const raw = recording.created_at || "";
+    const iso = raw.includes("Z") || raw.includes("+") ? raw : raw.replace(" ", "T") + "Z";
+    return new Date(iso).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "medium",
+    });
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden hover:border-emerald-500/40 dark:hover:border-slate-700 transition-all shadow-lg flex flex-col justify-between">
       <div>
@@ -64,16 +86,8 @@ export const RecordingCard: React.FC<RecordingCardProps> = ({
             <span className="text-slate-400 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" /> Flight Recorded:
             </span>
-            <span className="text-slate-700 dark:text-slate-200">
-              {new Date(
-                recording.created_at.includes("Z") || recording.created_at.includes("+")
-                  ? recording.created_at
-                  : recording.created_at.replace(" ", "T") + "Z"
-              ).toLocaleString("en-IN", {
-                dateStyle: "medium",
-                timeStyle: "medium",
-                timeZone: "Asia/Kolkata",
-              })}{" "}
+            <span className="text-slate-700 dark:text-slate-200 font-medium">
+              {formatFlightTimeIST()}{" "}
               <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1 py-0.5 rounded border border-emerald-500/20">IST</span>
             </span>
           </div>
