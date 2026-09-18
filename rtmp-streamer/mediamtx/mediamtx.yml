@@ -42,11 +42,18 @@ api: yes
 apiAddress: :9997
 
 ###############################################
-# Authentication — DISABLED for RTSP ingest from nginx-rtmp
-# nginx-rtmp validates stream keys via on_publish callback BEFORE relaying here
+# Authentication — Open access (Nginx-RTMP validates stream keys before relay)
 ###############################################
-# authMethod: http
-# authHTTPAddress: http://server:5011/api/hooks/auth
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass: ""
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+      - action: api
+      - action: metrics
 
 ###############################################
 # Paths Configuration
