@@ -32,8 +32,8 @@ webrtcAdditionalHosts: ["14.97.37.70", "rtmp.dhanushuav.in"]
 hls: yes
 hlsAddress: :8888
 hlsVariant: mpegts
-hlsSegmentCount: 3
-hlsSegmentDuration: 1s
+hlsSegmentCount: 2
+hlsSegmentDuration: 700ms
 hlsPartDuration: 200ms
 hlsAllowOrigins: ["*"]
 
